@@ -1,19 +1,31 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-import { createRawFile } from "./file.js";
-/**
- * Create an object that implements the File interface. This object is intended to be
- * passed into RequestBodyType.formData, and is not guaranteed to work as expected in
- * other situations.
- *
- * Use this function to create a File object for use in RequestBodyType.formData in environments
- * where the global File object is unavailable.
- *
- * @param content - the content of the file as a Uint8Array in memory.
- * @param name - the name of the file.
- * @param options - optional metadata about the file, e.g. file name, file size, MIME type.
- */
-export function createFile(content, name, options = {}) {
-    return createRawFile(content, name, options);
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+var createFile_exports = {};
+__export(createFile_exports, {
+  createFile: () => createFile
+});
+module.exports = __toCommonJS(createFile_exports);
+var import_file = require("./file.js");
+function createFile(content, name, options = {}) {
+  return (0, import_file.createRawFile)(content, name, options);
 }
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
+  createFile
+});
 //# sourceMappingURL=createFile.js.map

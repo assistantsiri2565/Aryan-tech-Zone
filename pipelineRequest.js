@@ -1,31 +1,15 @@
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-var pipelineRequest_exports = {};
-__export(pipelineRequest_exports, {
-  createPipelineRequest: () => createPipelineRequest
-});
-module.exports = __toCommonJS(pipelineRequest_exports);
-var import_ts_http_runtime = require("@typespec/ts-http-runtime");
-function createPipelineRequest(options) {
-  return (0, import_ts_http_runtime.createPipelineRequest)(options);
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+import { createPipelineRequest as tspCreatePipelineRequest, } from "@typespec/ts-http-runtime";
+/**
+ * Creates a new pipeline request with the given options.
+ * This method is to allow for the easy setting of default values and not required.
+ * @param options - The options to create the request with.
+ */
+export function createPipelineRequest(options) {
+    // Cast required due to difference between ts-http-runtime requiring AbortSignal while core-rest-pipeline allows
+    // the more generic AbortSignalLike. The wrapAbortSignalLike pipeline policy will take care of ensuring that any AbortSignalLike in the request
+    // is converted into a true AbortSignal.
+    return tspCreatePipelineRequest(options);
 }
-// Annotate the CommonJS export names for ESM import in node:
-0 && (module.exports = {
-  createPipelineRequest
-});
 //# sourceMappingURL=pipelineRequest.js.map
