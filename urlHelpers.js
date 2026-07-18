@@ -1,11 +1,7 @@
-"use strict";
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.getRequestUrl = getRequestUrl;
-exports.appendQueryParams = appendQueryParams;
-const operationHelpers_js_1 = require("./operationHelpers.js");
-const interfaceHelpers_js_1 = require("./interfaceHelpers.js");
+import { getOperationArgumentValueFromParameter } from "./operationHelpers.js";
+import { getPathStringFromParameter } from "./interfaceHelpers.js";
 const CollectionFormatToDelimiterMap = {
     CSV: ",",
     SSV: " ",
@@ -13,7 +9,7 @@ const CollectionFormatToDelimiterMap = {
     TSV: "\t",
     Pipes: "|",
 };
-function getRequestUrl(baseUri, operationSpec, operationArguments, fallbackObject) {
+export function getRequestUrl(baseUri, operationSpec, operationArguments, fallbackObject) {
     const urlReplacements = calculateUrlReplacements(operationSpec, operationArguments, fallbackObject);
     let isAbsolutePath = false;
     let requestUrl = replaceAll(baseUri, urlReplacements);
@@ -57,8 +53,8 @@ function calculateUrlReplacements(operationSpec, operationArguments, fallbackObj
     const result = new Map();
     if (operationSpec.urlParameters?.length) {
         for (const urlParameter of operationSpec.urlParameters) {
-            let urlParameterValue = (0, operationHelpers_js_1.getOperationArgumentValueFromParameter)(operationArguments, urlParameter, fallbackObject);
-            const parameterPathString = (0, interfaceHelpers_js_1.getPathStringFromParameter)(urlParameter);
+            let urlParameterValue = getOperationArgumentValueFromParameter(operationArguments, urlParameter, fallbackObject);
+            const parameterPathString = getPathStringFromParameter(urlParameter);
             urlParameterValue = operationSpec.serializer.serialize(urlParameter.mapper, urlParameterValue, parameterPathString);
             if (!urlParameter.skipEncoding) {
                 urlParameterValue = encodeURIComponent(urlParameterValue);
@@ -107,10 +103,10 @@ function calculateQueryParameters(operationSpec, operationArguments, fallbackObj
             if (queryParameter.mapper.type.name === "Sequence" && queryParameter.mapper.serializedName) {
                 sequenceParams.add(queryParameter.mapper.serializedName);
             }
-            let queryParameterValue = (0, operationHelpers_js_1.getOperationArgumentValueFromParameter)(operationArguments, queryParameter, fallbackObject);
+            let queryParameterValue = getOperationArgumentValueFromParameter(operationArguments, queryParameter, fallbackObject);
             if ((queryParameterValue !== undefined && queryParameterValue !== null) ||
                 queryParameter.mapper.required) {
-                queryParameterValue = operationSpec.serializer.serialize(queryParameter.mapper, queryParameterValue, (0, interfaceHelpers_js_1.getPathStringFromParameter)(queryParameter));
+                queryParameterValue = operationSpec.serializer.serialize(queryParameter.mapper, queryParameterValue, getPathStringFromParameter(queryParameter));
                 const delimiter = queryParameter.collectionFormat
                     ? CollectionFormatToDelimiterMap[queryParameter.collectionFormat]
                     : "";
@@ -145,7 +141,7 @@ function calculateQueryParameters(operationSpec, operationArguments, fallbackObj
                     (queryParameter.collectionFormat === "CSV" || queryParameter.collectionFormat === "Pipes")) {
                     queryParameterValue = queryParameterValue.join(delimiter);
                 }
-                result.set(queryParameter.mapper.serializedName || (0, interfaceHelpers_js_1.getPathStringFromParameter)(queryParameter), queryParameterValue);
+                result.set(queryParameter.mapper.serializedName || getPathStringFromParameter(queryParameter), queryParameterValue);
             }
         }
     }
@@ -180,7 +176,7 @@ function simpleParseQueryParams(queryString) {
     return result;
 }
 /** @internal */
-function appendQueryParams(url, queryParams, sequenceParams, noOverwrite = false) {
+export function appendQueryParams(url, queryParams, sequenceParams, noOverwrite = false) {
     if (queryParams.size === 0) {
         return url;
     }
