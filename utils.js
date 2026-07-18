@@ -1,233 +1,81 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
-import { AuthenticationRequiredError, CredentialUnavailableError } from "../errors.js";
-import { credentialLogger, formatError } from "../util/logging.js";
-import { DefaultAuthority, DefaultAuthorityHost, DefaultTenantId } from "../constants.js";
-import { randomUUID as coreRandomUUID, isNode, isNodeLike } from "@azure/core-util";
-import { AbortError } from "@azure/abort-controller";
-import { msalCommon } from "./msal.js";
-const logger = credentialLogger("IdentityUtils");
+const DefaultScopeSuffix = "/.default";
 /**
- * Latest AuthenticationRecord version
+ * Error message for Service Fabric Managed Identity environment.
  */
-const LatestAuthenticationRecordVersion = "1.0";
+export const serviceFabricErrorMessage = "Specifying a `clientId` or `resourceId` is not supported by the Service Fabric managed identity environment. The managed identity configuration is determined by the Service Fabric cluster resource configuration. See https://aka.ms/servicefabricmi for more information";
 /**
- * Ensures the validity of the MSAL token
- * @internal
- */
-export function ensureValidMsalToken(scopes, msalToken, getTokenOptions) {
-    const error = (message) => {
-        logger.getToken.info(message);
-        return new AuthenticationRequiredError({
-            scopes: Array.isArray(scopes) ? scopes : [scopes],
-            getTokenOptions,
-            message,
-        });
-    };
-    if (!msalToken) {
-        throw error("No response");
-    }
-    if (!msalToken.expiresOn) {
-        throw error(`Response had no "expiresOn" property.`);
-    }
-    if (!msalToken.accessToken) {
-        throw error(`Response had no "accessToken" property.`);
-    }
-}
-/**
- * Returns the authority host from either the options bag or the AZURE_AUTHORITY_HOST environment variable.
+ * Most MSIs send requests to the IMDS endpoint, or a similar endpoint.
+ * These are GET requests that require sending a `resource` parameter on the query.
+ * This resource can be derived from the scopes received through the getToken call, as long as only one scope is received.
+ * Multiple scopes assume that the resulting token will have access to multiple resources, which won't be the case.
  *
- * Defaults to {@link DefaultAuthorityHost}.
- * @internal
+ * For that reason, when we encounter multiple scopes, we return undefined.
+ * It's up to the individual MSI implementations to throw the errors (which helps us provide less generic errors).
  */
-export function getAuthorityHost(options) {
-    let authorityHost = options?.authorityHost;
-    if (!authorityHost && isNodeLike) {
-        authorityHost = process.env.AZURE_AUTHORITY_HOST;
-    }
-    return authorityHost ?? DefaultAuthorityHost;
-}
-/**
- * Generates a valid authority by combining a host with a tenantId.
- * @internal
- */
-export function getAuthority(tenantId, host) {
-    if (!host) {
-        host = DefaultAuthorityHost;
-    }
-    if (new RegExp(`${tenantId}/?$`).test(host)) {
-        return host;
-    }
-    if (host.endsWith("/")) {
-        return host + tenantId;
-    }
-    else {
-        return `${host}/${tenantId}`;
-    }
-}
-/**
- * Generates the known authorities.
- * If the Tenant Id is `adfs`, the authority can't be validated since the format won't match the expected one.
- * For that reason, we have to force MSAL to disable validating the authority
- * by sending it within the known authorities in the MSAL configuration.
- * @internal
- */
-export function getKnownAuthorities(tenantId, authorityHost, disableInstanceDiscovery) {
-    if ((tenantId === "adfs" && authorityHost) || disableInstanceDiscovery) {
-        return [authorityHost];
-    }
-    return [];
-}
-/**
- * Generates a logger that can be passed to the MSAL clients.
- * @param credLogger - The logger of the credential.
- * @internal
- */
-export const defaultLoggerCallback = (credLogger, platform = isNode ? "Node" : "Browser") => (level, message, containsPii) => {
-    if (containsPii) {
-        return;
-    }
-    switch (level) {
-        case msalCommon.LogLevel.Error:
-            credLogger.info(`MSAL ${platform} V2 error: ${message}`);
+export function mapScopesToResource(scopes) {
+    let scope = "";
+    if (Array.isArray(scopes)) {
+        if (scopes.length !== 1) {
             return;
-        case msalCommon.LogLevel.Info:
-            credLogger.info(`MSAL ${platform} V2 info message: ${message}`);
-            return;
-        case msalCommon.LogLevel.Verbose:
-            credLogger.info(`MSAL ${platform} V2 verbose message: ${message}`);
-            return;
-        case msalCommon.LogLevel.Warning:
-            credLogger.info(`MSAL ${platform} V2 warning: ${message}`);
-            return;
+        }
+        scope = scopes[0];
     }
-};
-/**
- * @internal
- */
-export function getMSALLogLevel(logLevel) {
-    switch (logLevel) {
-        case "error":
-            return msalCommon.LogLevel.Error;
-        case "info":
-            return msalCommon.LogLevel.Info;
-        case "verbose":
-            return msalCommon.LogLevel.Verbose;
-        case "warning":
-            return msalCommon.LogLevel.Warning;
-        default:
-            // default msal logging level should be Info
-            return msalCommon.LogLevel.Info;
+    else if (typeof scopes === "string") {
+        scope = scopes;
     }
+    if (!scope.endsWith(DefaultScopeSuffix)) {
+        return scope;
+    }
+    return scope.substr(0, scope.lastIndexOf(DefaultScopeSuffix));
 }
 /**
- * Wraps core-util's randomUUID in order to allow for mocking in tests.
- * This prepares the library for the upcoming core-util update to ESM.
- *
- * @internal
- * @returns A string containing a random UUID
+ * Given a token response, return the expiration timestamp as the number of milliseconds from the Unix epoch.
+ * @param body - A parsed response body from the authentication endpoint.
  */
-export function randomUUID() {
-    return coreRandomUUID();
-}
-/**
- * Handles MSAL errors.
- */
-export function handleMsalError(scopes, error, getTokenOptions) {
-    if (error.name === "AuthError" ||
-        error.name === "ClientAuthError" ||
-        error.name === "BrowserAuthError") {
-        const msalError = error;
-        switch (msalError.errorCode) {
-            case "endpoints_resolution_error":
-                logger.info(formatError(scopes, error.message));
-                return new CredentialUnavailableError(error.message);
-            case "device_code_polling_cancelled":
-                return new AbortError("The authentication has been aborted by the caller.");
-            case "consent_required":
-            case "interaction_required":
-            case "login_required":
-                logger.info(formatError(scopes, `Authentication returned errorCode ${msalError.errorCode}`));
-                break;
-            default:
-                logger.info(formatError(scopes, `Failed to acquire token: ${error.message}`));
-                break;
+export function parseExpirationTimestamp(body) {
+    if (typeof body.expires_on === "number") {
+        return body.expires_on * 1000;
+    }
+    if (typeof body.expires_on === "string") {
+        const asNumber = +body.expires_on;
+        if (!isNaN(asNumber)) {
+            return asNumber * 1000;
+        }
+        const asDate = Date.parse(body.expires_on);
+        if (!isNaN(asDate)) {
+            return asDate;
         }
     }
-    if (error.name === "ClientConfigurationError" ||
-        error.name === "BrowserConfigurationAuthError" ||
-        error.name === "AbortError" ||
-        error.name === "AuthenticationError") {
-        return error;
+    if (typeof body.expires_in === "number") {
+        return Date.now() + body.expires_in * 1000;
     }
-    if (error.name === "NativeAuthError") {
-        logger.info(formatError(scopes, `Error from the native broker: ${error.message} with status code: ${error.statusCode}`));
-        return error;
-    }
-    return new AuthenticationRequiredError({ scopes, getTokenOptions, message: error.message });
-}
-// transformations
-export function publicToMsal(account) {
-    return {
-        localAccountId: account.homeAccountId,
-        environment: account.authority,
-        username: account.username,
-        homeAccountId: account.homeAccountId,
-        tenantId: account.tenantId,
-    };
-}
-export function msalToPublic(clientId, account) {
-    const record = {
-        authority: account.environment ?? DefaultAuthority,
-        homeAccountId: account.homeAccountId,
-        tenantId: account.tenantId || DefaultTenantId,
-        username: account.username,
-        clientId,
-        version: LatestAuthenticationRecordVersion,
-    };
-    return record;
+    throw new Error(`Failed to parse token expiration from body. expires_in="${body.expires_in}", expires_on="${body.expires_on}"`);
 }
 /**
- * Serializes an `AuthenticationRecord` into a string.
- *
- * The output of a serialized authentication record will contain the following properties:
- *
- * - "authority"
- * - "homeAccountId"
- * - "clientId"
- * - "tenantId"
- * - "username"
- * - "version"
- *
- * To later convert this string to a serialized `AuthenticationRecord`, please use the exported function `deserializeAuthenticationRecord()`.
+ * Given a token response, return the expiration timestamp as the number of milliseconds from the Unix epoch.
+ * @param body - A parsed response body from the authentication endpoint.
  */
-export function serializeAuthenticationRecord(record) {
-    return JSON.stringify(record);
-}
-/**
- * Deserializes a previously serialized authentication record from a string into an object.
- *
- * The input string must contain the following properties:
- *
- * - "authority"
- * - "homeAccountId"
- * - "clientId"
- * - "tenantId"
- * - "username"
- * - "version"
- *
- * If the version we receive is unsupported, an error will be thrown.
- *
- * At the moment, the only available version is: "1.0", which is always set when the authentication record is serialized.
- *
- * @param serializedRecord - Authentication record previously serialized into string.
- * @returns AuthenticationRecord.
- */
-export function deserializeAuthenticationRecord(serializedRecord) {
-    const parsed = JSON.parse(serializedRecord);
-    if (parsed.version && parsed.version !== LatestAuthenticationRecordVersion) {
-        throw Error("Unsupported AuthenticationRecord version");
+export function parseRefreshTimestamp(body) {
+    if (body.refresh_on) {
+        if (typeof body.refresh_on === "number") {
+            return body.refresh_on * 1000;
+        }
+        if (typeof body.refresh_on === "string") {
+            const asNumber = +body.refresh_on;
+            if (!isNaN(asNumber)) {
+                return asNumber * 1000;
+            }
+            const asDate = Date.parse(body.refresh_on);
+            if (!isNaN(asDate)) {
+                return asDate;
+            }
+        }
+        throw new Error(`Failed to parse refresh_on from body. refresh_on="${body.refresh_on}"`);
     }
-    return parsed;
+    else {
+        return undefined;
+    }
 }
 //# sourceMappingURL=utils.js.map

@@ -1,61 +1,62 @@
-export * from "./plugins/consumer.js";
-export { IdentityPlugin } from "./plugins/provider.js";
-import type { TokenCredential } from "@azure/core-auth";
-export { AuthenticationError, ErrorResponse, AggregateAuthenticationError, AuthenticationErrorName, AggregateAuthenticationErrorName, CredentialUnavailableError, CredentialUnavailableErrorName, AuthenticationRequiredError, AuthenticationRequiredErrorOptions, } from "./errors.js";
-export { AuthenticationRecord } from "./msal/types.js";
-export { serializeAuthenticationRecord, deserializeAuthenticationRecord } from "./msal/utils.js";
-export { TokenCredentialOptions } from "./tokenCredentialOptions.js";
-export { MultiTenantTokenCredentialOptions } from "./credentials/multiTenantTokenCredentialOptions.js";
-export { AuthorityValidationOptions } from "./credentials/authorityValidationOptions.js";
-export { BrokerAuthOptions } from "./credentials/brokerAuthOptions.js";
-export { BrokerOptions, BrokerEnabledOptions, BrokerDisabledOptions, } from "./msal/nodeFlows/brokerOptions.js";
-export { InteractiveCredentialOptions } from "./credentials/interactiveCredentialOptions.js";
-export { ChainedTokenCredential } from "./credentials/chainedTokenCredential.js";
-export { ClientSecretCredential } from "./credentials/clientSecretCredential.js";
-export { ClientSecretCredentialOptions } from "./credentials/clientSecretCredentialOptions.js";
-export { DefaultAzureCredential } from "./credentials/defaultAzureCredential.js";
-export { DefaultAzureCredentialOptions, DefaultAzureCredentialClientIdOptions, DefaultAzureCredentialResourceIdOptions, DefaultAzureCredentialEnvVars, } from "./credentials/defaultAzureCredentialOptions.js";
-export { EnvironmentCredential } from "./credentials/environmentCredential.js";
-export { EnvironmentCredentialOptions } from "./credentials/environmentCredentialOptions.js";
-export { ClientCertificateCredential } from "./credentials/clientCertificateCredential.js";
-export { ClientCertificateCredentialPEMConfiguration, ClientCertificatePEMCertificatePath, ClientCertificatePEMCertificate, } from "./credentials/clientCertificateCredentialModels.js";
-export { ClientCertificateCredentialOptions } from "./credentials/clientCertificateCredentialOptions.js";
-export { ClientAssertionCredential } from "./credentials/clientAssertionCredential.js";
-export { ClientAssertionCredentialOptions } from "./credentials/clientAssertionCredentialOptions.js";
-export { CredentialPersistenceOptions } from "./credentials/credentialPersistenceOptions.js";
-export { AzureCliCredential } from "./credentials/azureCliCredential.js";
-export { AzureCliCredentialOptions } from "./credentials/azureCliCredentialOptions.js";
-export { AzureDeveloperCliCredential } from "./credentials/azureDeveloperCliCredential.js";
-export { AzureDeveloperCliCredentialOptions } from "./credentials/azureDeveloperCliCredentialOptions.js";
-export { InteractiveBrowserCredential } from "./credentials/interactiveBrowserCredential.js";
-export { InteractiveBrowserCredentialNodeOptions, InteractiveBrowserCredentialInBrowserOptions, BrowserLoginStyle, } from "./credentials/interactiveBrowserCredentialOptions.js";
-export { ManagedIdentityCredential } from "./credentials/managedIdentityCredential/index.js";
-export { ManagedIdentityCredentialClientIdOptions, ManagedIdentityCredentialResourceIdOptions, ManagedIdentityCredentialObjectIdOptions, } from "./credentials/managedIdentityCredential/options.js";
-export { DeviceCodeCredential } from "./credentials/deviceCodeCredential.js";
-export { DeviceCodePromptCallback, DeviceCodeInfo, } from "./credentials/deviceCodeCredentialOptions.js";
-export { DeviceCodeCredentialOptions } from "./credentials/deviceCodeCredentialOptions.js";
-export { AzurePipelinesCredential as AzurePipelinesCredential } from "./credentials/azurePipelinesCredential.js";
-export { AzurePipelinesCredentialOptions as AzurePipelinesCredentialOptions } from "./credentials/azurePipelinesCredentialOptions.js";
-export { AuthorizationCodeCredential } from "./credentials/authorizationCodeCredential.js";
-export { AuthorizationCodeCredentialOptions } from "./credentials/authorizationCodeCredentialOptions.js";
-export { AzurePowerShellCredential } from "./credentials/azurePowerShellCredential.js";
-export { AzurePowerShellCredentialOptions } from "./credentials/azurePowerShellCredentialOptions.js";
-export { OnBehalfOfCredentialOptions, OnBehalfOfCredentialSecretOptions, OnBehalfOfCredentialCertificateOptions, OnBehalfOfCredentialAssertionOptions, } from "./credentials/onBehalfOfCredentialOptions.js";
-export { UsernamePasswordCredential } from "./credentials/usernamePasswordCredential.js";
-export { UsernamePasswordCredentialOptions } from "./credentials/usernamePasswordCredentialOptions.js";
-export { VisualStudioCodeCredential } from "./credentials/visualStudioCodeCredential.js";
-export { VisualStudioCodeCredentialOptions } from "./credentials/visualStudioCodeCredentialOptions.js";
-export { OnBehalfOfCredential } from "./credentials/onBehalfOfCredential.js";
-export { WorkloadIdentityCredential } from "./credentials/workloadIdentityCredential.js";
-export { WorkloadIdentityCredentialOptions } from "./credentials/workloadIdentityCredentialOptions.js";
-export { BrowserCustomizationOptions } from "./credentials/browserCustomizationOptions.js";
-export { TokenCachePersistenceOptions } from "./msal/nodeFlows/tokenCachePersistenceOptions.js";
-export { TokenCredential, GetTokenOptions, AccessToken } from "@azure/core-auth";
-export { logger } from "./util/logging.js";
-export { AzureAuthorityHosts } from "./constants.js";
+import type { AccessToken, GetTokenOptions, TokenCredential } from "@azure/core-auth";
+import type { TokenCredentialOptions } from "../../tokenCredentialOptions.js";
+import type { ManagedIdentityCredentialClientIdOptions, ManagedIdentityCredentialObjectIdOptions, ManagedIdentityCredentialResourceIdOptions } from "./options.js";
 /**
- * Returns a new instance of the {@link DefaultAzureCredential}.
+ * Attempts authentication using a managed identity available at the deployment environment.
+ * This authentication type works in Azure VMs, App Service instances, Azure Functions applications,
+ * Azure Kubernetes Services, Azure Service Fabric instances and inside of the Azure Cloud Shell.
+ *
+ * More information about configuring managed identities can be found here:
+ * https://learn.microsoft.com/azure/active-directory/managed-identities-azure-resources/overview
  */
-export declare function getDefaultAzureCredential(): TokenCredential;
-export { getBearerTokenProvider, GetBearerTokenProviderOptions } from "./tokenProvider.js";
+export declare class ManagedIdentityCredential implements TokenCredential {
+    private managedIdentityApp;
+    private identityClient;
+    private clientId?;
+    private resourceId?;
+    private objectId?;
+    private msiRetryConfig;
+    private isAvailableIdentityClient;
+    private sendProbeRequest;
+    /**
+     * Creates an instance of ManagedIdentityCredential with the client ID of a
+     * user-assigned identity, or app registration (when working with AKS pod-identity).
+     *
+     * @param clientId - The client ID of the user-assigned identity, or app registration (when working with AKS pod-identity).
+     * @param options - Options for configuring the client which makes the access token request.
+     */
+    constructor(clientId: string, options?: TokenCredentialOptions);
+    /**
+     * Creates an instance of ManagedIdentityCredential with a client ID
+     *
+     * @param options - Options for configuring the client which makes the access token request.
+     */
+    constructor(options?: ManagedIdentityCredentialClientIdOptions);
+    /**
+     * Creates an instance of ManagedIdentityCredential with a resource ID
+     *
+     * @param options - Options for configuring the resource which makes the access token request.
+     */
+    constructor(options?: ManagedIdentityCredentialResourceIdOptions);
+    /**
+     * Creates an instance of ManagedIdentityCredential with an object ID
+     *
+     * @param options - Options for configuring the resource which makes the access token request.
+     */
+    constructor(options?: ManagedIdentityCredentialObjectIdOptions);
+    /**
+     * Authenticates with Microsoft Entra ID and returns an access token if successful.
+     * If authentication fails, a {@link CredentialUnavailableError} will be thrown with the details of the failure.
+     * If an unexpected error occurs, an {@link AuthenticationError} will be thrown with the details of the failure.
+     *
+     * @param scopes - The list of scopes for which the token will have access.
+     * @param options - The options used to configure any requests this
+     *                TokenCredential implementation might make.
+     */
+    getToken(scopes: string | string[], options?: GetTokenOptions): Promise<AccessToken>;
+    /**
+     * Ensures the validity of the MSAL token
+     */
+    private ensureValidMsalToken;
+}
 //# sourceMappingURL=index.d.ts.map
