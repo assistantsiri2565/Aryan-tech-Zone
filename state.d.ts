@@ -1,8 +1,8 @@
 import type { Instrumenter } from "./interfaces.js";
 /**
- * Defines the shared state between CJS and ESM by re-exporting the CJS state.
+ * Browser-only implementation of the module's state. The browser esm variant will not load the commonjs state, so we do not need to share state between the two.
  */
 export declare const state: {
     instrumenterImplementation: Instrumenter | undefined;
 };
-//# sourceMappingURL=state.d.ts.map
+//# sourceMappingURL=state-browser.d.mts.map
