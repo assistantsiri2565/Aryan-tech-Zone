@@ -1,4 +1,5 @@
+"use strict";
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
-export {};
+Object.defineProperty(exports, "__esModule", { value: true });
 //# sourceMappingURL=models.js.map
