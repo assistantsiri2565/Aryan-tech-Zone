@@ -1,10 +1,13 @@
+"use strict";
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.AzureKeyCredential = void 0;
 /**
  * A static-key-based credential that supports updating
  * the underlying key value.
  */
-export class AzureKeyCredential {
+class AzureKeyCredential {
     _key;
     /**
      * The value of the key to be used in authentication
@@ -36,4 +39,5 @@ export class AzureKeyCredential {
         this._key = newKey;
     }
 }
+exports.AzureKeyCredential = AzureKeyCredential;
 //# sourceMappingURL=azureKeyCredential.js.map
