@@ -1,6 +1,10 @@
+"use strict";
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
-import { state } from "./state.js";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getOperationArgumentValueFromParameter = getOperationArgumentValueFromParameter;
+exports.getOperationRequestInfo = getOperationRequestInfo;
+const state_1 = require("./state-cjs.js");
 /**
  * @internal
  * Retrieves the value to use for a given operation argument
@@ -9,7 +13,7 @@ import { state } from "./state.js";
  * @param fallbackObject - If something isn't found in the arguments bag, look here.
  *  Generally used to look at the service client properties.
  */
-export function getOperationArgumentValueFromParameter(operationArguments, parameter, fallbackObject) {
+function getOperationArgumentValueFromParameter(operationArguments, parameter, fallbackObject) {
     let parameterPath = parameter.parameterPath;
     const parameterMapper = parameter.mapper;
     let value;
@@ -84,14 +88,14 @@ const originalRequestSymbol = Symbol.for("@azure/core-client original request");
 function hasOriginalRequest(request) {
     return originalRequestSymbol in request;
 }
-export function getOperationRequestInfo(request) {
+function getOperationRequestInfo(request) {
     if (hasOriginalRequest(request)) {
         return getOperationRequestInfo(request[originalRequestSymbol]);
     }
-    let info = state.operationRequestMap.get(request);
+    let info = state_1.state.operationRequestMap.get(request);
     if (!info) {
         info = {};
-        state.operationRequestMap.set(request, info);
+        state_1.state.operationRequestMap.set(request, info);
     }
     return info;
 }

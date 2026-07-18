@@ -1,14 +1,18 @@
+"use strict";
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
-import { logger as coreClientLogger } from "./log.js";
-import { decodeStringToString } from "./base64.js";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.parseCAEChallenge = parseCAEChallenge;
+exports.authorizeRequestOnClaimChallenge = authorizeRequestOnClaimChallenge;
+const log_js_1 = require("./log.js");
+const base64_js_1 = require("./base64.js");
 /**
  * Converts: `Bearer a="b", c="d", Bearer d="e", f="g"`.
  * Into: `[ { a: 'b', c: 'd' }, { d: 'e', f: 'g' } ]`.
  *
  * @internal
  */
-export function parseCAEChallenge(challenges) {
+function parseCAEChallenge(challenges) {
     const bearerChallenges = `, ${challenges.trim()}`.split(", Bearer ").filter((x) => x);
     return bearerChallenges.map((challenge) => {
         const challengeParts = `${challenge.trim()}, `.split('", ').filter((x) => x);
@@ -46,9 +50,9 @@ export function parseCAEChallenge(challenges) {
  * claims="eyJhY2Nlc3NfdG9rZW4iOnsibmJmIjp7ImVzc2VudGlhbCI6dHJ1ZSwgInZhbHVlIjoiMTYwMzc0MjgwMCJ9fX0="
  * ```
  */
-export async function authorizeRequestOnClaimChallenge(onChallengeOptions) {
+async function authorizeRequestOnClaimChallenge(onChallengeOptions) {
     const { scopes, response } = onChallengeOptions;
-    const logger = onChallengeOptions.logger || coreClientLogger;
+    const logger = onChallengeOptions.logger || log_js_1.logger;
     const challenge = response.headers.get("WWW-Authenticate");
     if (!challenge) {
         logger.info(`The WWW-Authenticate header was missing. Failed to perform the Continuous Access Evaluation authentication flow.`);
@@ -61,7 +65,7 @@ export async function authorizeRequestOnClaimChallenge(onChallengeOptions) {
         return false;
     }
     const accessToken = await onChallengeOptions.getAccessToken(parsedChallenge.scope ? [parsedChallenge.scope] : scopes, {
-        claims: decodeStringToString(parsedChallenge.claims),
+        claims: (0, base64_js_1.decodeStringToString)(parsedChallenge.claims),
     });
     if (!accessToken) {
         return false;

@@ -1,11 +1,14 @@
+"use strict";
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.XML_CHARKEY = exports.XML_ATTRKEY = void 0;
 /**
  * Default key used to access the XML attributes.
  */
-export const XML_ATTRKEY = "$";
+exports.XML_ATTRKEY = "$";
 /**
  * Default key used to access the XML value content.
  */
-export const XML_CHARKEY = "_";
+exports.XML_CHARKEY = "_";
 //# sourceMappingURL=interfaces.js.map

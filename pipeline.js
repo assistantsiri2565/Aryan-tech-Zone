@@ -1,24 +1,27 @@
+"use strict";
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
-import { deserializationPolicy } from "./deserializationPolicy.js";
-import { bearerTokenAuthenticationPolicy, createPipelineFromOptions, } from "@azure/core-rest-pipeline";
-import { serializationPolicy } from "./serializationPolicy.js";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.createClientPipeline = createClientPipeline;
+const deserializationPolicy_js_1 = require("./deserializationPolicy.js");
+const core_rest_pipeline_1 = require("@azure/core-rest-pipeline");
+const serializationPolicy_js_1 = require("./serializationPolicy.js");
 /**
  * Creates a new Pipeline for use with a Service Client.
  * Adds in deserializationPolicy by default.
  * Also adds in bearerTokenAuthenticationPolicy if passed a TokenCredential.
  * @param options - Options to customize the created pipeline.
  */
-export function createClientPipeline(options = {}) {
-    const pipeline = createPipelineFromOptions(options ?? {});
+function createClientPipeline(options = {}) {
+    const pipeline = (0, core_rest_pipeline_1.createPipelineFromOptions)(options ?? {});
     if (options.credentialOptions) {
-        pipeline.addPolicy(bearerTokenAuthenticationPolicy({
+        pipeline.addPolicy((0, core_rest_pipeline_1.bearerTokenAuthenticationPolicy)({
             credential: options.credentialOptions.credential,
             scopes: options.credentialOptions.credentialScopes,
         }));
     }
-    pipeline.addPolicy(serializationPolicy(options.serializationOptions), { phase: "Serialize" });
-    pipeline.addPolicy(deserializationPolicy(options.deserializationOptions), {
+    pipeline.addPolicy((0, serializationPolicy_js_1.serializationPolicy)(options.serializationOptions), { phase: "Serialize" });
+    pipeline.addPolicy((0, deserializationPolicy_js_1.deserializationPolicy)(options.deserializationOptions), {
         phase: "Deserialize",
     });
     return pipeline;

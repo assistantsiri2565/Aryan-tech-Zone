@@ -1,10 +1,13 @@
+"use strict";
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
-import { createDefaultHttpClient } from "@azure/core-rest-pipeline";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getCachedDefaultHttpClient = getCachedDefaultHttpClient;
+const core_rest_pipeline_1 = require("@azure/core-rest-pipeline");
 let cachedHttpClient;
-export function getCachedDefaultHttpClient() {
+function getCachedDefaultHttpClient() {
     if (!cachedHttpClient) {
-        cachedHttpClient = createDefaultHttpClient();
+        cachedHttpClient = (0, core_rest_pipeline_1.createDefaultHttpClient)();
     }
     return cachedHttpClient;
 }

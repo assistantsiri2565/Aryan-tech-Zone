@@ -1,9 +1,12 @@
+"use strict";
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.state = void 0;
 /**
  * Holds the singleton operationRequestMap, to be shared across CJS and ESM imports.
  */
-export const state = {
+exports.state = {
     operationRequestMap: new WeakMap(),
 };
 //# sourceMappingURL=state-cjs.js.map

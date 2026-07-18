@@ -1,17 +1,20 @@
+"use strict";
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
-import { createPipelineRequest } from "@azure/core-rest-pipeline";
-import { createClientPipeline } from "./pipeline.js";
-import { flattenResponse } from "./utils.js";
-import { getCachedDefaultHttpClient } from "./httpClientCache.js";
-import { getOperationRequestInfo } from "./operationHelpers.js";
-import { getRequestUrl } from "./urlHelpers.js";
-import { getStreamingResponseStatusCodes } from "./interfaceHelpers.js";
-import { logger } from "./log.js";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ServiceClient = void 0;
+const core_rest_pipeline_1 = require("@azure/core-rest-pipeline");
+const pipeline_js_1 = require("./pipeline.js");
+const utils_js_1 = require("./utils.js");
+const httpClientCache_js_1 = require("./httpClientCache.js");
+const operationHelpers_js_1 = require("./operationHelpers.js");
+const urlHelpers_js_1 = require("./urlHelpers.js");
+const interfaceHelpers_js_1 = require("./interfaceHelpers.js");
+const log_js_1 = require("./log.js");
 /**
  * Initializes a new instance of the ServiceClient.
  */
-export class ServiceClient {
+class ServiceClient {
     /**
      * If specified, this is the base URI that requests will be made against for this ServiceClient.
      * If it is not specified, then all OperationSpecs must contain a baseUrl property.
@@ -42,10 +45,10 @@ export class ServiceClient {
         this._requestContentType = options.requestContentType;
         this._endpoint = options.endpoint ?? options.baseUri;
         if (options.baseUri) {
-            logger.warning("The baseUri option for SDK Clients has been deprecated, please use endpoint instead.");
+            log_js_1.logger.warning("The baseUri option for SDK Clients has been deprecated, please use endpoint instead.");
         }
         this._allowInsecureConnection = options.allowInsecureConnection;
-        this._httpClient = options.httpClient || getCachedDefaultHttpClient();
+        this._httpClient = options.httpClient || (0, httpClientCache_js_1.getCachedDefaultHttpClient)();
         this.pipeline = options.pipeline || createDefaultPipeline(options);
         if (options.additionalPolicies?.length) {
             for (const { policy, position } of options.additionalPolicies) {
@@ -78,12 +81,12 @@ export class ServiceClient {
         // Templatized URLs sometimes reference properties on the ServiceClient child class,
         // so we have to pass `this` below in order to search these properties if they're
         // not part of OperationArguments
-        const url = getRequestUrl(endpoint, operationSpec, operationArguments, this);
-        const request = createPipelineRequest({
+        const url = (0, urlHelpers_js_1.getRequestUrl)(endpoint, operationSpec, operationArguments, this);
+        const request = (0, core_rest_pipeline_1.createPipelineRequest)({
             url,
         });
         request.method = operationSpec.httpMethod;
-        const operationInfo = getOperationRequestInfo(request);
+        const operationInfo = (0, operationHelpers_js_1.getOperationRequestInfo)(request);
         operationInfo.operationSpec = operationSpec;
         operationInfo.operationArguments = operationArguments;
         const contentType = operationSpec.contentType || this._requestContentType;
@@ -121,11 +124,11 @@ export class ServiceClient {
             request.allowInsecureConnection = true;
         }
         if (request.streamResponseStatusCodes === undefined) {
-            request.streamResponseStatusCodes = getStreamingResponseStatusCodes(operationSpec);
+            request.streamResponseStatusCodes = (0, interfaceHelpers_js_1.getStreamingResponseStatusCodes)(operationSpec);
         }
         try {
             const rawResponse = await this.sendRequest(request);
-            const flatResponse = flattenResponse(rawResponse, operationSpec.responses[rawResponse.status]);
+            const flatResponse = (0, utils_js_1.flattenResponse)(rawResponse, operationSpec.responses[rawResponse.status]);
             if (options?.onResponse) {
                 options.onResponse(rawResponse, flatResponse);
             }
@@ -134,7 +137,7 @@ export class ServiceClient {
         catch (error) {
             if (typeof error === "object" && error?.response) {
                 const rawResponse = error.response;
-                const flatResponse = flattenResponse(rawResponse, operationSpec.responses[error.statusCode] || operationSpec.responses["default"]);
+                const flatResponse = (0, utils_js_1.flattenResponse)(rawResponse, operationSpec.responses[error.statusCode] || operationSpec.responses["default"]);
                 error.details = flatResponse;
                 if (options?.onResponse) {
                     options.onResponse(rawResponse, flatResponse, error);
@@ -144,12 +147,13 @@ export class ServiceClient {
         }
     }
 }
+exports.ServiceClient = ServiceClient;
 function createDefaultPipeline(options) {
     const credentialScopes = getCredentialScopes(options);
     const credentialOptions = options.credential && credentialScopes
         ? { credentialScopes, credential: options.credential }
         : undefined;
-    return createClientPipeline({
+    return (0, pipeline_js_1.createClientPipeline)({
         ...options,
         credentialOptions,
     });

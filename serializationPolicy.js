@@ -1,23 +1,29 @@
+"use strict";
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
-import { XML_ATTRKEY, XML_CHARKEY } from "./interfaces.js";
-import { getOperationArgumentValueFromParameter, getOperationRequestInfo, } from "./operationHelpers.js";
-import { MapperTypeNames } from "./serializer.js";
-import { getPathStringFromParameter } from "./interfaceHelpers.js";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.serializationPolicyName = void 0;
+exports.serializationPolicy = serializationPolicy;
+exports.serializeHeaders = serializeHeaders;
+exports.serializeRequestBody = serializeRequestBody;
+const interfaces_js_1 = require("./interfaces.js");
+const operationHelpers_js_1 = require("./operationHelpers.js");
+const serializer_js_1 = require("./serializer.js");
+const interfaceHelpers_js_1 = require("./interfaceHelpers.js");
 /**
  * The programmatic identifier of the serializationPolicy.
  */
-export const serializationPolicyName = "serializationPolicy";
+exports.serializationPolicyName = "serializationPolicy";
 /**
  * This policy handles assembling the request body and headers using
  * an OperationSpec and OperationArguments on the request.
  */
-export function serializationPolicy(options = {}) {
+function serializationPolicy(options = {}) {
     const stringifyXML = options.stringifyXML;
     return {
-        name: serializationPolicyName,
+        name: exports.serializationPolicyName,
         sendRequest(request, next) {
-            const operationInfo = getOperationRequestInfo(request);
+            const operationInfo = (0, operationHelpers_js_1.getOperationRequestInfo)(request);
             const operationSpec = operationInfo?.operationSpec;
             const operationArguments = operationInfo?.operationArguments;
             if (operationSpec && operationArguments) {
@@ -31,12 +37,12 @@ export function serializationPolicy(options = {}) {
 /**
  * @internal
  */
-export function serializeHeaders(request, operationArguments, operationSpec) {
+function serializeHeaders(request, operationArguments, operationSpec) {
     if (operationSpec.headerParameters) {
         for (const headerParameter of operationSpec.headerParameters) {
-            let headerValue = getOperationArgumentValueFromParameter(operationArguments, headerParameter);
+            let headerValue = (0, operationHelpers_js_1.getOperationArgumentValueFromParameter)(operationArguments, headerParameter);
             if ((headerValue !== null && headerValue !== undefined) || headerParameter.mapper.required) {
-                headerValue = operationSpec.serializer.serialize(headerParameter.mapper, headerValue, getPathStringFromParameter(headerParameter));
+                headerValue = operationSpec.serializer.serialize(headerParameter.mapper, headerValue, (0, interfaceHelpers_js_1.getPathStringFromParameter)(headerParameter));
                 const headerCollectionPrefix = headerParameter.mapper
                     .headerCollectionPrefix;
                 if (headerCollectionPrefix) {
@@ -45,7 +51,7 @@ export function serializeHeaders(request, operationArguments, operationSpec) {
                     }
                 }
                 else {
-                    request.headers.set(headerParameter.mapper.serializedName || getPathStringFromParameter(headerParameter), headerValue);
+                    request.headers.set(headerParameter.mapper.serializedName || (0, interfaceHelpers_js_1.getPathStringFromParameter)(headerParameter), headerValue);
                 }
             }
         }
@@ -60,7 +66,7 @@ export function serializeHeaders(request, operationArguments, operationSpec) {
 /**
  * @internal
  */
-export function serializeRequestBody(request, operationArguments, operationSpec, stringifyXML = function () {
+function serializeRequestBody(request, operationArguments, operationSpec, stringifyXML = function () {
     throw new Error("XML serialization unsupported!");
 }) {
     const serializerOptions = operationArguments.options?.serializerOptions;
@@ -68,12 +74,12 @@ export function serializeRequestBody(request, operationArguments, operationSpec,
         xml: {
             rootName: serializerOptions?.xml.rootName ?? "",
             includeRoot: serializerOptions?.xml.includeRoot ?? false,
-            xmlCharKey: serializerOptions?.xml.xmlCharKey ?? XML_CHARKEY,
+            xmlCharKey: serializerOptions?.xml.xmlCharKey ?? interfaces_js_1.XML_CHARKEY,
         },
     };
     const xmlCharKey = updatedOptions.xml.xmlCharKey;
     if (operationSpec.requestBody && operationSpec.requestBody.mapper) {
-        request.body = getOperationArgumentValueFromParameter(operationArguments, operationSpec.requestBody);
+        request.body = (0, operationHelpers_js_1.getOperationArgumentValueFromParameter)(operationArguments, operationSpec.requestBody);
         const bodyMapper = operationSpec.requestBody.mapper;
         const { required, serializedName, xmlName, xmlElementName, xmlNamespace, xmlNamespacePrefix, nullable, } = bodyMapper;
         const typeName = bodyMapper.type.name;
@@ -81,13 +87,13 @@ export function serializeRequestBody(request, operationArguments, operationSpec,
             if ((request.body !== undefined && request.body !== null) ||
                 (nullable && request.body === null) ||
                 required) {
-                const requestBodyParameterPathString = getPathStringFromParameter(operationSpec.requestBody);
+                const requestBodyParameterPathString = (0, interfaceHelpers_js_1.getPathStringFromParameter)(operationSpec.requestBody);
                 request.body = operationSpec.serializer.serialize(bodyMapper, request.body, requestBodyParameterPathString, updatedOptions);
-                const isStream = typeName === MapperTypeNames.Stream;
+                const isStream = typeName === serializer_js_1.MapperTypeNames.Stream;
                 if (operationSpec.isXML) {
                     const xmlnsKey = xmlNamespacePrefix ? `xmlns:${xmlNamespacePrefix}` : "xmlns";
                     const value = getXmlValueWithNamespace(xmlNamespace, xmlnsKey, typeName, request.body, updatedOptions);
-                    if (typeName === MapperTypeNames.Sequence) {
+                    if (typeName === serializer_js_1.MapperTypeNames.Sequence) {
                         request.body = stringifyXML(prepareXMLRootList(value, xmlElementName || xmlName || serializedName, xmlnsKey, xmlNamespace), { rootName: xmlName || serializedName, xmlCharKey });
                     }
                     else if (!isStream) {
@@ -97,7 +103,7 @@ export function serializeRequestBody(request, operationArguments, operationSpec,
                         });
                     }
                 }
-                else if (typeName === MapperTypeNames.String &&
+                else if (typeName === serializer_js_1.MapperTypeNames.String &&
                     (operationSpec.contentType?.match("text/plain") || operationSpec.mediaType === "text")) {
                     // the String serializer has validated that request body is a string
                     // so just send the string.
@@ -115,10 +121,10 @@ export function serializeRequestBody(request, operationArguments, operationSpec,
     else if (operationSpec.formDataParameters && operationSpec.formDataParameters.length > 0) {
         request.formData = {};
         for (const formDataParameter of operationSpec.formDataParameters) {
-            const formDataParameterValue = getOperationArgumentValueFromParameter(operationArguments, formDataParameter);
+            const formDataParameterValue = (0, operationHelpers_js_1.getOperationArgumentValueFromParameter)(operationArguments, formDataParameter);
             if (formDataParameterValue !== undefined && formDataParameterValue !== null) {
-                const formDataParameterPropertyName = formDataParameter.mapper.serializedName || getPathStringFromParameter(formDataParameter);
-                request.formData[formDataParameterPropertyName] = operationSpec.serializer.serialize(formDataParameter.mapper, formDataParameterValue, getPathStringFromParameter(formDataParameter), updatedOptions);
+                const formDataParameterPropertyName = formDataParameter.mapper.serializedName || (0, interfaceHelpers_js_1.getPathStringFromParameter)(formDataParameter);
+                request.formData[formDataParameterPropertyName] = operationSpec.serializer.serialize(formDataParameter.mapper, formDataParameterValue, (0, interfaceHelpers_js_1.getPathStringFromParameter)(formDataParameter), updatedOptions);
             }
         }
     }
@@ -132,7 +138,7 @@ function getXmlValueWithNamespace(xmlNamespace, xmlnsKey, typeName, serializedVa
     if (xmlNamespace && !["Composite", "Sequence", "Dictionary"].includes(typeName)) {
         const result = {};
         result[options.xml.xmlCharKey] = serializedValue;
-        result[XML_ATTRKEY] = { [xmlnsKey]: xmlNamespace };
+        result[interfaces_js_1.XML_ATTRKEY] = { [xmlnsKey]: xmlNamespace };
         return result;
     }
     return serializedValue;
@@ -145,7 +151,7 @@ function prepareXMLRootList(obj, elementName, xmlNamespaceKey, xmlNamespace) {
         return { [elementName]: obj };
     }
     const result = { [elementName]: obj };
-    result[XML_ATTRKEY] = { [xmlNamespaceKey]: xmlNamespace };
+    result[interfaces_js_1.XML_ATTRKEY] = { [xmlNamespaceKey]: xmlNamespace };
     return result;
 }
 //# sourceMappingURL=serializationPolicy.js.map
