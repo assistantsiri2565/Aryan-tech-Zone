@@ -1,101 +1,79 @@
-# Aryan Tech Zone - Company Website
+# Azure Core Authentication client library for JavaScript
 
-Professional IT services website with work request forms, UPI payment integration, SQL Server database, and email notifications.
+The `@azure/core-auth` package provides core interfaces and helper methods for authenticating with Azure services using Azure Active Directory and other authentication schemes common across the Azure SDK. As a "core" library, it shouldn't need to be added as a dependency to any user code, only other Azure SDK libraries.
 
-## Features
+## Getting started
 
-- Modern, client-friendly responsive website
-- Company branding with custom logo
-- 100+ workers showcase and IT services listing
-- **3-step workflow:** Fill form → Pay via UPI → Confirmation
-- Work requests saved to **SQL Server**
-- Email notifications to **aryankumar112211225@gmail.com**
-- UPI payment to **aryankumar112211225-1@okhdfcbank**
+### Installation
 
-## Quick Start
-
-### 1. Install SQL Server
-
-Install [SQL Server Express](https://www.microsoft.com/en-us/sql-server/sql-server-downloads) and run the setup script:
-
-```sql
--- Open SQL Server Management Studio (SSMS) and run:
--- backend/sql/setup.sql
-```
-
-### 2. Configure Backend
-
-```bash
-cd backend
-npm install
-```
-
-Copy `.env.example` to `.env` and update your settings:
-
-```bash
-copy .env.example .env
-```
-
-Edit `.env` with your details:
-
-| Variable | Description |
-|----------|-------------|
-| `DB_SERVER` | SQL Server address (default: localhost) |
-| `DB_PASSWORD` | Your SQL Server password |
-| `EMAIL_PASS` | Gmail App Password (see below) |
-| `ADMIN_EMAIL` | aryankumar112211225@gmail.com |
-
-**Gmail App Password setup:**
-1. Go to [Google Account Security](https://myaccount.google.com/security)
-2. Enable 2-Step Verification
-3. Go to App Passwords → Create one for "Mail"
-4. Paste the 16-character password in `EMAIL_PASS`
-
-### 3. Start the Server
-
-```bash
-cd backend
-npm start
-```
-
-Open **http://localhost:3000** in your browser.
-
-## How It Works
-
-1. **Client fills work form** → Saved to SQL Server → Email sent to admin
-2. **Client pays via UPI** (9319704764) → Enters transaction ID
-3. **Payment confirmed** → Saved to SQL Server → Payment + work details emailed to admin
-
-## Project Structure
+Install this library using npm as follows
 
 ```
-my company/
-├── frontend/
-│   ├── index.html          # Main website
-│   ├── css/style.css       # Styling
-│   ├── js/app.js           # Frontend logic
-│   └── assets/logo.png     # Company logo
-├── backend/
-│   ├── server.js           # Express API server
-│   ├── db.js               # SQL Server connection
-│   ├── email.js            # Email notifications
-│   ├── sql/setup.sql       # Database setup script
-│   ├── package.json
-│   └── .env.example
-└── README.md
+npm install @azure/core-auth
 ```
 
-## API Endpoints
+## Key Concepts
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/work-request` | Submit work request |
-| POST | `/api/payment` | Confirm UPI payment |
-| GET | `/api/health` | Server health check |
+The `TokenCredential` interface represents a credential capable of providing an authentication token. The `@azure/identity` package contains various credentials that implement the `TokenCredential` interface.
 
-## Contact
+The `AzureKeyCredential` is a static key-based credential that supports key rotation via the `update` method. Use this when a single secret value is needed for authentication, e.g. when using a shared access key.
 
-- **Phone:** +91 9319704764
-- **UPI ID:** aryankumar112211225-1@okhdfcbank
-- **Email:** aryankumar112211225@gmail.com
-- **Company:** Aryan Tech Zone
+The `AzureNamedKeyCredential` is a static name/key-based credential that supports name and key rotation via the `update` method. Use this when both a secret value and a label are needed, e.g. when using a shared access key and shared access key name.
+
+The `AzureSASCredential` is a static signature-based credential that supports updating the signature value via the `update` method. Use this when using a shared access signature.
+
+## Examples
+
+### AzureKeyCredential
+
+```ts snippet:ReadmeSampleAzureKeyCredential
+import { AzureKeyCredential } from "@azure/core-auth";
+
+const credential = new AzureKeyCredential("secret value");
+
+console.log(credential.key); // prints: "secret value"
+
+credential.update("other secret value");
+
+console.log(credential.key); // prints: "other secret value"
+```
+
+### AzureNamedKeyCredential
+
+```ts snippet:ReadmeSampleAzureNamedCredential
+import { AzureNamedKeyCredential } from "@azure/core-auth";
+
+const credential = new AzureNamedKeyCredential("ManagedPolicy", "secret value");
+
+console.log(`${credential.name}, ${credential.key}`); // prints: "ManagedPolicy, secret value"
+
+credential.update("OtherManagedPolicy", "other secret value");
+
+console.log(`${credential.name}, ${credential.key}`); // prints: "OtherManagedPolicy, other secret value"
+```
+
+### AzureSASCredential
+
+```ts snippet:ReadmeSampleSASCredential
+import { AzureSASCredential } from "@azure/core-auth";
+
+const credential = new AzureSASCredential("signature1");
+
+console.log(credential.signature); // prints: "signature1"
+
+credential.update("signature2");
+
+console.log(credential.signature); // prints: "signature2"
+```
+
+## Next steps
+
+You can build and run the tests locally by executing `npm run test`. Explore the `test` folder to see advanced usage and behavior of the public classes.
+
+## Troubleshooting
+
+If you run into issues while using this library, please feel free to [file an issue](https://github.com/Azure/azure-sdk-for-js/issues/new).
+
+## Contributing
+
+If you'd like to contribute to this library, please read the [contributing guide](https://github.com/Azure/azure-sdk-for-js/blob/main/CONTRIBUTING.md) to learn more about how to build and test the code.
