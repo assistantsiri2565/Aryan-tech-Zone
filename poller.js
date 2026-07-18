@@ -1,11 +1,8 @@
-"use strict";
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.buildCreatePoller = void 0;
-const operation_js_1 = require("./operation.js");
-const constants_js_1 = require("./constants.js");
-const core_util_1 = require("@azure/core-util");
+import { deserializeState, initOperation, pollOperation } from "./operation.js";
+import { POLL_INTERVAL_IN_MS } from "./constants.js";
+import { delay } from "@azure/core-util";
 const createStateProxy = () => ({
     /**
      * The state at this point is created to be of type OperationState<TResult>.
@@ -29,10 +26,10 @@ const createStateProxy = () => ({
 /**
  * Returns a poller factory.
  */
-function buildCreatePoller(inputs) {
+export function buildCreatePoller(inputs) {
     const { getOperationLocation, getStatusFromInitialResponse, getStatusFromPollResponse, isOperationError, getResourceLocation, getPollingInterval, getError, resolveOnUnsuccessful, } = inputs;
     return async ({ init, poll }, options) => {
-        const { processResult, updateState, withOperationLocation: withOperationLocationCallback, intervalInMs = constants_js_1.POLL_INTERVAL_IN_MS, restoreFrom, } = options || {};
+        const { processResult, updateState, withOperationLocation: withOperationLocationCallback, intervalInMs = POLL_INTERVAL_IN_MS, restoreFrom, } = options || {};
         const stateProxy = createStateProxy();
         const withOperationLocation = withOperationLocationCallback
             ? (() => {
@@ -47,8 +44,8 @@ function buildCreatePoller(inputs) {
             })()
             : undefined;
         const state = restoreFrom
-            ? (0, operation_js_1.deserializeState)(restoreFrom)
-            : await (0, operation_js_1.initOperation)({
+            ? deserializeState(restoreFrom)
+            : await initOperation({
                 init,
                 stateProxy,
                 processResult,
@@ -95,7 +92,7 @@ function buildCreatePoller(inputs) {
                     if (!poller.isDone()) {
                         await poller.poll({ abortSignal });
                         while (!poller.isDone()) {
-                            await (0, core_util_1.delay)(currentPollIntervalInMs, { abortSignal });
+                            await delay(currentPollIntervalInMs, { abortSignal });
                             await poller.poll({ abortSignal });
                         }
                     }
@@ -137,7 +134,7 @@ function buildCreatePoller(inputs) {
                             throw state.error;
                     }
                 }
-                await (0, operation_js_1.pollOperation)({
+                await pollOperation({
                     poll,
                     state,
                     stateProxy,
@@ -170,5 +167,4 @@ function buildCreatePoller(inputs) {
         return poller;
     };
 }
-exports.buildCreatePoller = buildCreatePoller;
 //# sourceMappingURL=poller.js.map
