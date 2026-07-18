@@ -1,54 +1,69 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-import { logPolicy } from "./policies/logPolicy.js";
-import { createEmptyPipeline } from "./pipeline.js";
-import { redirectPolicy } from "./policies/redirectPolicy.js";
-import { userAgentPolicy } from "./policies/userAgentPolicy.js";
-import { multipartPolicy, multipartPolicyName } from "./policies/multipartPolicy.js";
-import { decompressResponsePolicy } from "./policies/decompressResponsePolicy.js";
-import { defaultRetryPolicy } from "./policies/defaultRetryPolicy.js";
-import { formDataPolicy } from "./policies/formDataPolicy.js";
-import { isNodeLike } from "@azure/core-util";
-import { proxyPolicy } from "./policies/proxyPolicy.js";
-import { setClientRequestIdPolicy } from "./policies/setClientRequestIdPolicy.js";
-import { agentPolicy } from "./policies/agentPolicy.js";
-import { tlsPolicy } from "./policies/tlsPolicy.js";
-import { tracingPolicy } from "./policies/tracingPolicy.js";
-import { wrapAbortSignalLikePolicy } from "./policies/wrapAbortSignalLikePolicy.js";
-/**
- * Create a new pipeline with a default set of customizable policies.
- * @param options - Options to configure a custom pipeline.
- */
-export function createPipelineFromOptions(options) {
-    const pipeline = createEmptyPipeline();
-    if (isNodeLike) {
-        if (options.agent) {
-            pipeline.addPolicy(agentPolicy(options.agent));
-        }
-        if (options.tlsOptions) {
-            pipeline.addPolicy(tlsPolicy(options.tlsOptions));
-        }
-        pipeline.addPolicy(proxyPolicy(options.proxyOptions));
-        pipeline.addPolicy(decompressResponsePolicy());
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+var createPipelineFromOptions_exports = {};
+__export(createPipelineFromOptions_exports, {
+  createPipelineFromOptions: () => createPipelineFromOptions
+});
+module.exports = __toCommonJS(createPipelineFromOptions_exports);
+var import_logPolicy = require("./policies/logPolicy.js");
+var import_pipeline = require("./pipeline.js");
+var import_redirectPolicy = require("./policies/redirectPolicy.js");
+var import_userAgentPolicy = require("./policies/userAgentPolicy.js");
+var import_multipartPolicy = require("./policies/multipartPolicy.js");
+var import_decompressResponsePolicy = require("./policies/decompressResponsePolicy.js");
+var import_defaultRetryPolicy = require("./policies/defaultRetryPolicy.js");
+var import_formDataPolicy = require("./policies/formDataPolicy.js");
+var import_core_util = require("@azure/core-util");
+var import_proxyPolicy = require("./policies/proxyPolicy.js");
+var import_setClientRequestIdPolicy = require("./policies/setClientRequestIdPolicy.js");
+var import_agentPolicy = require("./policies/agentPolicy.js");
+var import_tlsPolicy = require("./policies/tlsPolicy.js");
+var import_tracingPolicy = require("./policies/tracingPolicy.js");
+var import_wrapAbortSignalLikePolicy = require("./policies/wrapAbortSignalLikePolicy.js");
+function createPipelineFromOptions(options) {
+  const pipeline = (0, import_pipeline.createEmptyPipeline)();
+  if (import_core_util.isNodeLike) {
+    if (options.agent) {
+      pipeline.addPolicy((0, import_agentPolicy.agentPolicy)(options.agent));
     }
-    pipeline.addPolicy(wrapAbortSignalLikePolicy());
-    pipeline.addPolicy(formDataPolicy(), { beforePolicies: [multipartPolicyName] });
-    pipeline.addPolicy(userAgentPolicy(options.userAgentOptions));
-    pipeline.addPolicy(setClientRequestIdPolicy(options.telemetryOptions?.clientRequestIdHeaderName));
-    // The multipart policy is added after policies with no phase, so that
-    // policies can be added between it and formDataPolicy to modify
-    // properties (e.g., making the boundary constant in recorded tests).
-    pipeline.addPolicy(multipartPolicy(), { afterPhase: "Deserialize" });
-    pipeline.addPolicy(defaultRetryPolicy(options.retryOptions), { phase: "Retry" });
-    pipeline.addPolicy(tracingPolicy({ ...options.userAgentOptions, ...options.loggingOptions }), {
-        afterPhase: "Retry",
-    });
-    if (isNodeLike) {
-        // Both XHR and Fetch expect to handle redirects automatically,
-        // so only include this policy when we're in Node.
-        pipeline.addPolicy(redirectPolicy(options.redirectOptions), { afterPhase: "Retry" });
+    if (options.tlsOptions) {
+      pipeline.addPolicy((0, import_tlsPolicy.tlsPolicy)(options.tlsOptions));
     }
-    pipeline.addPolicy(logPolicy(options.loggingOptions), { afterPhase: "Sign" });
-    return pipeline;
+    pipeline.addPolicy((0, import_proxyPolicy.proxyPolicy)(options.proxyOptions));
+    pipeline.addPolicy((0, import_decompressResponsePolicy.decompressResponsePolicy)());
+  }
+  pipeline.addPolicy((0, import_wrapAbortSignalLikePolicy.wrapAbortSignalLikePolicy)());
+  pipeline.addPolicy((0, import_formDataPolicy.formDataPolicy)(), { beforePolicies: [import_multipartPolicy.multipartPolicyName] });
+  pipeline.addPolicy((0, import_userAgentPolicy.userAgentPolicy)(options.userAgentOptions));
+  pipeline.addPolicy((0, import_setClientRequestIdPolicy.setClientRequestIdPolicy)(options.telemetryOptions?.clientRequestIdHeaderName));
+  pipeline.addPolicy((0, import_multipartPolicy.multipartPolicy)(), { afterPhase: "Deserialize" });
+  pipeline.addPolicy((0, import_defaultRetryPolicy.defaultRetryPolicy)(options.retryOptions), { phase: "Retry" });
+  pipeline.addPolicy((0, import_tracingPolicy.tracingPolicy)({ ...options.userAgentOptions, ...options.loggingOptions }), {
+    afterPhase: "Retry"
+  });
+  if (import_core_util.isNodeLike) {
+    pipeline.addPolicy((0, import_redirectPolicy.redirectPolicy)(options.redirectOptions), { afterPhase: "Retry" });
+  }
+  pipeline.addPolicy((0, import_logPolicy.logPolicy)(options.loggingOptions), { afterPhase: "Sign" });
+  return pipeline;
 }
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
+  createPipelineFromOptions
+});
 //# sourceMappingURL=createPipelineFromOptions.js.map
