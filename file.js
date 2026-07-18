@@ -1,109 +1,125 @@
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-var file_exports = {};
-__export(file_exports, {
-  createFile: () => import_createFile.createFile,
-  createFileFromStream: () => createFileFromStream,
-  createRawFile: () => createRawFile,
-  getRawContent: () => getRawContent,
-  hasRawContent: () => hasRawContent
-});
-module.exports = __toCommonJS(file_exports);
-var import_createFile = require("./createFile.js");
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
 function isNodeReadableStream(x) {
-  return typeof x === "object" && x !== null && "pipe" in x && typeof x.pipe === "function";
+    return typeof x === "object" && x !== null && "pipe" in x && typeof x.pipe === "function";
 }
 const unimplementedMethods = {
-  arrayBuffer: () => {
-    throw new Error("Not implemented");
-  },
-  bytes: () => {
-    throw new Error("Not implemented");
-  },
-  slice: () => {
-    throw new Error("Not implemented");
-  },
-  text: () => {
-    throw new Error("Not implemented");
-  }
-};
-const rawContent = /* @__PURE__ */ Symbol("rawContent");
-function hasRawContent(x) {
-  return typeof x[rawContent] === "function";
-}
-function getRawContent(blob) {
-  if (hasRawContent(blob)) {
-    return blob[rawContent]();
-  } else {
-    return blob;
-  }
-}
-function createRawFile(content, name, options = {}) {
-  return {
-    ...unimplementedMethods,
-    type: options.type ?? "",
-    lastModified: options.lastModified ?? (/* @__PURE__ */ new Date()).getTime(),
-    webkitRelativePath: options.webkitRelativePath ?? "",
-    size: content.byteLength,
-    name,
-    arrayBuffer: async () => toArrayBuffer(content).buffer,
-    stream: () => new Blob([toArrayBuffer(content)]).stream(),
-    [rawContent]: () => content
-  };
-}
-function createFileFromStream(stream, name, options = {}) {
-  return {
-    ...unimplementedMethods,
-    type: options.type ?? "",
-    lastModified: options.lastModified ?? (/* @__PURE__ */ new Date()).getTime(),
-    webkitRelativePath: options.webkitRelativePath ?? "",
-    size: options.size ?? -1,
-    name,
-    stream: () => {
-      const s = stream();
-      if (isNodeReadableStream(s)) {
-        throw new Error(
-          "Not supported: a Node stream was provided as input to createFileFromStream."
-        );
-      }
-      return s;
+    arrayBuffer: () => {
+        throw new Error("Not implemented");
     },
-    [rawContent]: stream
-  };
+    bytes: () => {
+        throw new Error("Not implemented");
+    },
+    slice: () => {
+        throw new Error("Not implemented");
+    },
+    text: () => {
+        throw new Error("Not implemented");
+    },
+};
+/**
+ * Private symbol used as key on objects created using createFile containing the
+ * original source of the file object.
+ *
+ * This is used in Node to access the original Node stream without using Blob#stream, which
+ * returns a web stream. This is done to avoid a couple of bugs to do with Blob#stream and
+ * Readable#to/fromWeb in Node versions we support:
+ * - https://github.com/nodejs/node/issues/42694 (fixed in Node 18.14)
+ * - https://github.com/nodejs/node/issues/48916 (fixed in Node 20.6)
+ *
+ * Once these versions are no longer supported, we may be able to stop doing this.
+ *
+ * @internal
+ */
+const rawContent = Symbol("rawContent");
+/**
+ * Type guard to check if a given object is a blob-like object with a raw content property.
+ */
+export function hasRawContent(x) {
+    return typeof x[rawContent] === "function";
 }
+/**
+ * Extract the raw content from a given blob-like object. If the input was created using createFile
+ * or createFileFromStream, the exact content passed into createFile/createFileFromStream will be used.
+ * For true instances of Blob and File, returns the actual blob.
+ *
+ * @internal
+ */
+export function getRawContent(blob) {
+    if (hasRawContent(blob)) {
+        return blob[rawContent]();
+    }
+    else {
+        return blob;
+    }
+}
+/**
+ * @internal
+ *
+ * Creates a File-like object tagged with rawContent for efficient streaming access.
+ * Used by the Node createFile to avoid Blob#stream() bugs.
+ */
+export function createRawFile(content, name, options = {}) {
+    return {
+        ...unimplementedMethods,
+        type: options.type ?? "",
+        lastModified: options.lastModified ?? new Date().getTime(),
+        webkitRelativePath: options.webkitRelativePath ?? "",
+        size: content.byteLength,
+        name,
+        arrayBuffer: async () => toArrayBuffer(content).buffer,
+        stream: () => new Blob([toArrayBuffer(content)]).stream(),
+        [rawContent]: () => content,
+    };
+}
+/**
+ * Create an object that implements the File interface. This object is intended to be
+ * passed into RequestBodyType.formData, and is not guaranteed to work as expected in
+ * other situations.
+ *
+ * Use this function to:
+ * - Create a File object for use in RequestBodyType.formData in environments where the
+ *   global File object is unavailable.
+ * - Create a File-like object from a readable stream without reading the stream into memory.
+ *
+ * @param stream - the content of the file as a callback returning a stream. When a File object made using createFile is
+ *                  passed in a request's form data map, the stream will not be read into memory
+ *                  and instead will be streamed when the request is made. In the event of a retry, the
+ *                  stream needs to be read again, so this callback SHOULD return a fresh stream if possible.
+ * @param name - the name of the file.
+ * @param options - optional metadata about the file, e.g. file name, file size, MIME type.
+ */
+export function createFileFromStream(stream, name, options = {}) {
+    return {
+        ...unimplementedMethods,
+        type: options.type ?? "",
+        lastModified: options.lastModified ?? new Date().getTime(),
+        webkitRelativePath: options.webkitRelativePath ?? "",
+        size: options.size ?? -1,
+        name,
+        stream: () => {
+            const s = stream();
+            if (isNodeReadableStream(s)) {
+                throw new Error("Not supported: a Node stream was provided as input to createFileFromStream.");
+            }
+            return s;
+        },
+        [rawContent]: stream,
+    };
+}
+export { createFile } from "./createFile-browser.mjs";
 function hasArrayBuffer(source) {
-  return "resize" in source.buffer;
+    return "resize" in source.buffer;
 }
 function toArrayBuffer(source) {
-  if (hasArrayBuffer(source)) {
-    if (source.byteOffset !== 0 || source.byteLength !== source.buffer.byteLength) {
-      return new Uint8Array(source);
+    if (hasArrayBuffer(source)) {
+        // ArrayBuffer — return a copy if the view is a subarray of a larger buffer
+        if (source.byteOffset !== 0 || source.byteLength !== source.buffer.byteLength) {
+            return new Uint8Array(source);
+        }
+        return source;
     }
-    return source;
-  }
-  return source.map((x) => x);
+    // SharedArrayBuffer
+    return source.map((x) => x);
 }
-// Annotate the CommonJS export names for ESM import in node:
-0 && (module.exports = {
-  createFile,
-  createFileFromStream,
-  createRawFile,
-  getRawContent,
-  hasRawContent
-});
 //# sourceMappingURL=file.js.map
