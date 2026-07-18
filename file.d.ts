@@ -87,5 +87,5 @@ export declare function createRawFile(content: Uint8Array, name: string, options
  * @param options - optional metadata about the file, e.g. file name, file size, MIME type.
  */
 export declare function createFileFromStream(stream: () => WebReadableStream<Uint8Array> | NodeReadableStream, name: string, options?: CreateFileFromStreamOptions): File;
-export { createFile } from "./createFile-browser.mjs";
+export { createFile } from "./createFile.js";
 //# sourceMappingURL=file.d.ts.map

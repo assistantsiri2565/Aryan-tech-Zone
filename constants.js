@@ -1,11 +1,5 @@
 // Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-/**
- * The default time interval to wait before sending the next polling request.
- */
-export const POLL_INTERVAL_IN_MS = 2000;
-/**
- * The closed set of terminal states.
- */
-export const terminalStates = ["succeeded", "canceled", "failed"];
+// Licensed under the MIT License.
+export const SDK_VERSION = "1.24.0";
+export const DEFAULT_RETRY_POLICY_COUNT = 3;
 //# sourceMappingURL=constants.js.map

@@ -107,7 +107,7 @@ export function createFileFromStream(stream, name, options = {}) {
         [rawContent]: stream,
     };
 }
-export { createFile } from "./createFile-browser.mjs";
+export { createFile } from "./createFile.js";
 function hasArrayBuffer(source) {
     return "resize" in source.buffer;
 }

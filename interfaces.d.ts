@@ -1,664 +1,455 @@
-import type { HttpClient, HttpMethods, PipelineOptions, PipelinePolicy, PipelineRequest, PipelineResponse, TransferProgressEvent } from "@azure/core-rest-pipeline";
 import type { AbortSignalLike } from "@azure/abort-controller";
 import type { OperationTracingOptions } from "@azure/core-tracing";
+import type { HttpMethods } from "@azure/core-util";
+import type { NodeBuffer, NodeReadableStream, WebReadableStream } from "@typespec/ts-http-runtime";
 /**
- * Default key used to access the XML attributes.
+ * A HttpHeaders collection represented as a simple JSON object.
  */
-export declare const XML_ATTRKEY = "$";
-/**
- * Default key used to access the XML value content.
- */
-export declare const XML_CHARKEY = "_";
-/**
- * Options to govern behavior of xml parser and builder.
- */
-export interface XmlOptions {
-    /**
-     * indicates the name of the root element in the resulting XML when building XML.
-     */
-    rootName?: string;
-    /**
-     * indicates whether the root element is to be included or not in the output when parsing XML.
-     */
-    includeRoot?: boolean;
-    /**
-     * key used to access the XML value content when parsing XML.
-     */
-    xmlCharKey?: string;
-}
-/**
- * Options to configure serialization/de-serialization behavior.
- */
-export interface SerializerOptions {
-    /**
-     * Options to configure xml parser/builder behavior.
-     */
-    xml: XmlOptions;
-    /**
-     * Normally additional properties are included in the result object, even if there is no mapper for them.
-     * This flag disables this behavior when true. It is used when parsing headers to avoid polluting the result object.
-     */
-    ignoreUnknownProperties?: boolean;
-}
-export type RequiredSerializerOptions = {
-    [K in keyof SerializerOptions]: Required<SerializerOptions[K]>;
+export type RawHttpHeaders = {
+    [headerName: string]: string;
 };
 /**
- * A type alias for future proofing.
+ * A HttpHeaders collection for input, represented as a simple JSON object.
  */
-export type OperationRequest = PipelineRequest;
+export type RawHttpHeadersInput = Record<string, string | number | boolean>;
 /**
- * Metadata that is used to properly parse a response.
+ * Represents a set of HTTP headers on a request/response.
+ * Header names are treated as case insensitive.
  */
-export interface OperationRequestInfo {
+export interface HttpHeaders extends Iterable<[string, string]> {
     /**
-     * Used to parse the response.
+     * Returns the value of a specific header or undefined if not set.
+     * @param name - The name of the header to retrieve.
      */
-    operationSpec?: OperationSpec;
+    get(name: string): string | undefined;
     /**
-     * Used to encode the request.
+     * Returns true if the specified header exists.
+     * @param name - The name of the header to check.
      */
-    operationArguments?: OperationArguments;
+    has(name: string): boolean;
     /**
-     * A function that returns the proper OperationResponseMap for the given OperationSpec and
-     * PipelineResponse combination. If this is undefined, then a simple status code lookup will
-     * be used.
+     * Sets a specific header with a given value.
+     * @param name - The name of the header to set.
+     * @param value - The value to use for the header.
      */
-    operationResponseGetter?: (operationSpec: OperationSpec, response: PipelineResponse) => undefined | OperationResponseMap;
+    set(name: string, value: string | number | boolean): void;
     /**
-     * Whether or not the PipelineResponse should be deserialized. Defaults to true.
+     * Removes a specific header from the collection.
+     * @param name - The name of the header to delete.
      */
-    shouldDeserialize?: boolean | ((response: PipelineResponse) => boolean);
+    delete(name: string): void;
+    /**
+     * Accesses a raw JS object that acts as a simple map
+     * of header names to values.
+     */
+    toJSON(options?: {
+        preserveCase?: boolean;
+    }): RawHttpHeaders;
 }
 /**
- * The base options type for all operations.
+ * A part of the request body in a multipart request.
  */
-export interface OperationOptions {
+export interface BodyPart {
     /**
-     * The signal which can be used to abort requests.
+     * The headers for this part of the multipart request.
+     */
+    headers: HttpHeaders;
+    /**
+     * The body of this part of the multipart request.
+     */
+    body: ((() => WebReadableStream<Uint8Array>) | (() => NodeReadableStream)) | WebReadableStream<Uint8Array> | NodeReadableStream | Uint8Array | Blob;
+}
+/**
+ * A request body consisting of multiple parts.
+ */
+export interface MultipartRequestBody {
+    /**
+     * The parts of the request body.
+     */
+    parts: BodyPart[];
+    /**
+     * The boundary separating each part of the request body.
+     * If not specified, a random boundary will be generated.
+     *
+     * When specified, '--' will be prepended to the boundary in the request to ensure the boundary follows the specification.
+     */
+    boundary?: string;
+}
+/**
+ * Types of bodies supported on the request.
+ * NodeReadableStream and () =\> NodeReadableStream is Node only.
+ * Blob, WebReadableStream<Uint8Array>, and () =\> WebReadableStream<Uint8Array> are browser only.
+ */
+export type RequestBodyType = NodeReadableStream | (() => NodeReadableStream) | WebReadableStream<Uint8Array> | (() => WebReadableStream<Uint8Array>) | Blob | ArrayBuffer | ArrayBufferView | FormData | string | null;
+/**
+ * An interface compatible with NodeJS's `http.Agent`.
+ * We want to avoid publicly re-exporting the actual interface,
+ * since it might vary across runtime versions.
+ */
+export interface Agent {
+    /**
+     * Destroy any sockets that are currently in use by the agent.
+     */
+    destroy(): void;
+    /**
+     * For agents with keepAlive enabled, this sets the maximum number of sockets that will be left open in the free state.
+     */
+    maxFreeSockets: number;
+    /**
+     * Determines how many concurrent sockets the agent can have open per origin.
+     */
+    maxSockets: number;
+    /**
+     * An object which contains queues of requests that have not yet been assigned to sockets.
+     */
+    requests: unknown;
+    /**
+     * An object which contains arrays of sockets currently in use by the agent.
+     */
+    sockets: unknown;
+}
+/**
+ * Metadata about a request being made by the pipeline.
+ */
+export interface PipelineRequest {
+    /**
+     * The URL to make the request to.
+     */
+    url: string;
+    /**
+     * The HTTP method to use when making the request.
+     */
+    method: HttpMethods;
+    /**
+     * The HTTP headers to use when making the request.
+     */
+    headers: HttpHeaders;
+    /**
+     * The number of milliseconds a request can take before automatically being terminated.
+     * If the request is terminated, an `AbortError` is thrown.
+     * Defaults to 0, which disables the timeout.
+     */
+    timeout: number;
+    /**
+     * Indicates whether the user agent should send cookies from the other domain in the case of cross-origin requests.
+     * Defaults to false.
+     */
+    withCredentials: boolean;
+    /**
+     * A unique identifier for the request. Used for logging and tracing.
+     */
+    requestId: string;
+    /**
+     * The HTTP body content (if any)
+     */
+    body?: RequestBodyType;
+    /**
+     * Body for a multipart request.
+     */
+    multipartBody?: MultipartRequestBody;
+    /**
+     * To simulate a browser form post
+     */
+    formData?: FormDataMap;
+    /**
+     * A list of response status codes whose corresponding PipelineResponse body should be treated as a stream.
+     * When streamResponseStatusCodes contains the value Number.POSITIVE_INFINITY any status would be treated as a stream.
+     */
+    streamResponseStatusCodes?: Set<number>;
+    /**
+     * Proxy configuration.
+     */
+    proxySettings?: ProxySettings;
+    /**
+     * If the connection should not be reused.
+     */
+    disableKeepAlive?: boolean;
+    /**
+     * Used to abort the request later.
      */
     abortSignal?: AbortSignalLike;
     /**
-     * Options used when creating and sending HTTP requests for this operation.
-     */
-    requestOptions?: OperationRequestOptions;
-    /**
-     * Options used when tracing is enabled.
+     * Tracing options to use for any created Spans.
      */
     tracingOptions?: OperationTracingOptions;
-    /**
-     * Options to override serialization/de-serialization behavior.
-     */
-    serializerOptions?: SerializerOptions;
-    /**
-     * A function to be called each time a response is received from the server
-     * while performing the requested operation.
-     * May be called multiple times.
-     */
-    onResponse?: RawResponseCallback;
-}
-/**
- * Options used when creating and sending HTTP requests for this operation.
- */
-export interface OperationRequestOptions {
-    /**
-     * User defined custom request headers that
-     * will be applied before the request is sent.
-     */
-    customHeaders?: {
-        [key: string]: string;
-    };
-    /**
-     * The number of milliseconds a request can take before automatically being terminated.
-     */
-    timeout?: number;
     /**
      * Callback which fires upon upload progress.
      */
     onUploadProgress?: (progress: TransferProgressEvent) => void;
-    /**
-     * Callback which fires upon download progress.
-     */
+    /** Callback which fires upon download progress. */
     onDownloadProgress?: (progress: TransferProgressEvent) => void;
-    /**
-     * Whether or not the HttpOperationResponse should be deserialized. If this is undefined, then the
-     * HttpOperationResponse should be deserialized.
-     */
-    shouldDeserialize?: boolean | ((response: PipelineResponse) => boolean);
-    /**
-     * Set to true if the request is sent over HTTP instead of HTTPS
-     */
+    /** Set to true if the request is sent over HTTP instead of HTTPS */
     allowInsecureConnection?: boolean;
+    /**
+     * NODEJS ONLY
+     *
+     * A Node-only option to provide a custom `http.Agent`/`https.Agent`.
+     * Does nothing when running in the browser.
+     */
+    agent?: Agent;
+    /**
+     * BROWSER ONLY
+     *
+     * A browser only option to enable browser Streams. If this option is set and a response is a stream
+     * the response will have a property `browserStream` instead of `blobBody` which will be undefined.
+     *
+     * Default value is false
+     */
+    enableBrowserStreams?: boolean;
+    /** Settings for configuring TLS authentication */
+    tlsSettings?: TlsSettings;
+    /**
+     * Additional options to set on the request. This provides a way to override
+     * existing ones or provide request properties that are not declared.
+     *
+     * For possible valid properties, see
+     *   - NodeJS https.request options:  https://nodejs.org/api/http.html#httprequestoptions-callback
+     *   - Browser RequestInit: https://developer.mozilla.org/en-US/docs/Web/API/RequestInit
+     *
+     * WARNING: Options specified here will override any properties of same names when request is sent by {@link HttpClient}.
+     */
+    requestOverrides?: Record<string, unknown>;
 }
 /**
- * A collection of properties that apply to a single invocation of an operation.
+ * Metadata about a response received by the pipeline.
  */
-export interface OperationArguments {
+export interface PipelineResponse {
     /**
-     * The parameters that were passed to the operation method.
+     * The request that generated this response.
      */
-    [parameterName: string]: unknown;
+    request: PipelineRequest;
     /**
-     * The optional arguments that are provided to an operation.
+     * The HTTP status code of the response.
      */
-    options?: OperationOptions;
+    status: number;
+    /**
+     * The HTTP response headers.
+     */
+    headers: HttpHeaders;
+    /**
+     * The response body as text (string format)
+     */
+    bodyAsText?: string | null;
+    /**
+     * BROWSER ONLY
+     *
+     * The response body as a browser Blob.
+     * Always undefined in node.js.
+     */
+    blobBody?: Promise<Blob>;
+    /**
+     * BROWSER ONLY
+     *
+     * The response body as a browser ReadableStream.
+     * Always undefined in node.js.
+     */
+    browserStreamBody?: WebReadableStream<Uint8Array>;
+    /**
+     * NODEJS ONLY
+     *
+     * The response body as a node.js Readable stream.
+     * Always undefined in the browser.
+     */
+    readableStreamBody?: NodeReadableStream;
 }
 /**
- * The format that will be used to join an array of values together for a query parameter value.
+ * A simple interface for making a pipeline request and receiving a response.
  */
-export type QueryCollectionFormat = "CSV" | "SSV" | "TSV" | "Pipes" | "Multi";
+export type SendRequest = (request: PipelineRequest) => Promise<PipelineResponse>;
 /**
- * Encodes how to reach a particular property on an object.
+ * The required interface for a client that makes HTTP requests
+ * on behalf of a pipeline.
  */
-export type ParameterPath = string | string[] | {
-    [propertyName: string]: ParameterPath;
+export interface HttpClient {
+    /**
+     * The method that makes the request and returns a response.
+     */
+    sendRequest: SendRequest;
+}
+/**
+ * Fired in response to upload or download progress.
+ */
+export type TransferProgressEvent = {
+    /**
+     * The number of bytes loaded so far.
+     */
+    loadedBytes: number;
 };
 /**
- * A common interface that all Operation parameter's extend.
+ * Options to configure a proxy for outgoing requests (Node.js only).
  */
-export interface OperationParameter {
+export interface ProxySettings {
     /**
-     * The path to this parameter's value in OperationArguments or the object that contains paths for
-     * each property's value in OperationArguments.
+     * The proxy's host address.
+     * Must include the protocol (e.g., http:// or https://).
      */
-    parameterPath: ParameterPath;
+    host: string;
     /**
-     * The mapper that defines how to validate and serialize this parameter's value.
+     * The proxy host's port.
      */
-    mapper: Mapper;
+    port: number;
+    /**
+     * The user name to authenticate with the proxy, if required.
+     */
+    username?: string;
+    /**
+     * The password to authenticate with the proxy, if required.
+     */
+    password?: string;
 }
 /**
- * A parameter for an operation that will be substituted into the operation's request URL.
+ * Each form data entry can be a string, Blob, or a File. If you wish to pass a file with a name but do not have
+ * access to the File class, you can use the createFile helper to create one.
  */
-export interface OperationURLParameter extends OperationParameter {
+export type FormDataValue = string | Blob | File;
+/**
+ * A simple object that provides form data, as if from a browser form.
+ */
+export type FormDataMap = {
+    [key: string]: FormDataValue | FormDataValue[];
+};
+/**
+ * Options that control how to retry failed requests.
+ */
+export interface PipelineRetryOptions {
     /**
-     * Whether or not to skip encoding the URL parameter's value before adding it to the URL.
+     * The maximum number of retry attempts. Defaults to 3.
      */
-    skipEncoding?: boolean;
+    maxRetries?: number;
+    /**
+     * The amount of delay in milliseconds between retry attempts. Defaults to 1000
+     * (1 second). The delay increases exponentially with each retry up to a maximum
+     * specified by maxRetryDelayInMs.
+     */
+    retryDelayInMs?: number;
+    /**
+     * The maximum delay in milliseconds allowed before retrying an operation. Defaults
+     * to 64000 (64 seconds).
+     */
+    maxRetryDelayInMs?: number;
 }
 /**
- * A parameter for an operation that will be added as a query parameter to the operation's HTTP
- * request.
+ * Represents a certificate credential for authentication.
  */
-export interface OperationQueryParameter extends OperationParameter {
+export interface CertificateCredential {
     /**
-     * Whether or not to skip encoding the query parameter's value before adding it to the URL.
+     * Optionally override the trusted CA certificates. Default is to trust
+     * the well-known CAs curated by Mozilla. Mozilla's CAs are completely
+     * replaced when CAs are explicitly specified using this option.
      */
-    skipEncoding?: boolean;
+    ca?: string | NodeBuffer | Array<string | NodeBuffer> | undefined;
     /**
-     * If this query parameter's value is a collection, what type of format should the value be
-     * converted to.
+     *  Cert chains in PEM format. One cert chain should be provided per
+     *  private key. Each cert chain should consist of the PEM formatted
+     *  certificate for a provided private key, followed by the PEM
+     *  formatted intermediate certificates (if any), in order, and not
+     *  including the root CA (the root CA must be pre-known to the peer,
+     *  see ca). When providing multiple cert chains, they do not have to
+     *  be in the same order as their private keys in key. If the
+     *  intermediate certificates are not provided, the peer will not be
+     *  able to validate the certificate, and the handshake will fail.
      */
-    collectionFormat?: QueryCollectionFormat;
+    cert?: string | NodeBuffer | Array<string | NodeBuffer> | undefined;
+    /**
+     * Private keys in PEM format. PEM allows the option of private keys
+     * being encrypted. Encrypted keys will be decrypted with
+     * options.passphrase. Multiple keys using different algorithms can be
+     * provided either as an array of unencrypted key strings or buffers,
+     * or an array of objects in the form `{pem: <string|buffer>[,passphrase: <string>]}`.
+     * The object form can only occur in an array.object.passphrase is optional.
+     * Encrypted keys will be decrypted with object.passphrase if provided, or options.passphrase if it is not.
+     */
+    key?: string | NodeBuffer | Array<NodeBuffer | KeyObject> | undefined;
+    /**
+     * Shared passphrase used for a single private key and/or a PFX.
+     */
+    passphrase?: string | undefined;
+    /**
+     * PFX or PKCS12 encoded private key and certificate chain. pfx is an
+     * alternative to providing key and cert individually. PFX is usually
+     * encrypted, if it is, passphrase will be used to decrypt it. Multiple
+     * PFX can be provided either as an array of unencrypted PFX buffers,
+     * or an array of objects in the form `{buf: <string|buffer>[,passphrase: <string>]}`.
+     * The object form can only occur in an array.object.passphrase is optional.
+     * Encrypted PFX will be decrypted with object.passphrase if provided, or options.passphrase if it is not.
+     */
+    pfx?: string | NodeBuffer | Array<string | NodeBuffer | PxfObject> | undefined;
 }
 /**
- * An OperationResponse that can be returned from an operation request for a single status code.
+ * Represents a certificate for TLS authentication.
  */
-export interface OperationResponseMap {
+export interface TlsSettings {
     /**
-     * The mapper that will be used to deserialize the response headers.
+     * Optionally override the trusted CA certificates. Default is to trust
+     * the well-known CAs curated by Mozilla. Mozilla's CAs are completely
+     * replaced when CAs are explicitly specified using this option.
      */
-    headersMapper?: Mapper;
+    ca?: string | NodeBuffer | Array<string | NodeBuffer> | undefined;
     /**
-     * The mapper that will be used to deserialize the response body.
+     *  Cert chains in PEM format. One cert chain should be provided per
+     *  private key. Each cert chain should consist of the PEM formatted
+     *  certificate for a provided private key, followed by the PEM
+     *  formatted intermediate certificates (if any), in order, and not
+     *  including the root CA (the root CA must be pre-known to the peer,
+     *  see ca). When providing multiple cert chains, they do not have to
+     *  be in the same order as their private keys in key. If the
+     *  intermediate certificates are not provided, the peer will not be
+     *  able to validate the certificate, and the handshake will fail.
      */
-    bodyMapper?: Mapper;
+    cert?: string | NodeBuffer | Array<string | NodeBuffer> | undefined;
     /**
-     * Indicates if this is an error response
+     * Private keys in PEM format. PEM allows the option of private keys
+     * being encrypted. Encrypted keys will be decrypted with
+     * options.passphrase. Multiple keys using different algorithms can be
+     * provided either as an array of unencrypted key strings or buffers,
+     * or an array of objects in the form `{pem: <string|buffer>[,passphrase: <string>]}`.
+     * The object form can only occur in an array.object.passphrase is optional.
+     * Encrypted keys will be decrypted with object.passphrase if provided, or options.passphrase if it is not.
      */
-    isError?: boolean;
+    key?: string | NodeBuffer | Array<NodeBuffer | KeyObject> | undefined;
+    /**
+     * Shared passphrase used for a single private key and/or a PFX.
+     */
+    passphrase?: string | undefined;
+    /**
+     * PFX or PKCS12 encoded private key and certificate chain. pfx is an
+     * alternative to providing key and cert individually. PFX is usually
+     * encrypted, if it is, passphrase will be used to decrypt it. Multiple
+     * PFX can be provided either as an array of unencrypted PFX buffers,
+     * or an array of objects in the form `{buf: <string|buffer>[,passphrase: <string>]}`.
+     * The object form can only occur in an array.object.passphrase is optional.
+     * Encrypted PFX will be decrypted with object.passphrase if provided, or options.passphrase if it is not.
+     */
+    pfx?: string | NodeBuffer | Array<string | NodeBuffer | PxfObject> | undefined;
 }
 /**
- * A specification that defines an operation.
+ * An interface compatible with NodeJS's `tls.KeyObject`.
+ * We want to avoid publicly re-exporting the actual interface,
+ * since it might vary across runtime versions.
  */
-export interface OperationSpec {
+export interface KeyObject {
     /**
-     * The serializer to use in this operation.
+     * Private keys in PEM format.
      */
-    readonly serializer: Serializer;
+    pem: string | NodeBuffer;
     /**
-     * The HTTP method that should be used by requests for this operation.
+     * Optional passphrase.
      */
-    readonly httpMethod: HttpMethods;
-    /**
-     * The URL that was provided in the service's specification. This will still have all of the URL
-     * template variables in it. If this is not provided when the OperationSpec is created, then it
-     * will be populated by a "baseUri" property on the ServiceClient.
-     */
-    readonly baseUrl?: string;
-    /**
-     * The fixed path for this operation's URL. This will still have all of the URL template variables
-     * in it.
-     */
-    readonly path?: string;
-    /**
-     * The content type of the request body. This value will be used as the "Content-Type" header if
-     * it is provided.
-     */
-    readonly contentType?: string;
-    /**
-     * The media type of the request body.
-     * This value can be used to aide in serialization if it is provided.
-     */
-    readonly mediaType?: "json" | "xml" | "form" | "binary" | "multipart" | "text" | "unknown" | string;
-    /**
-     * The parameter that will be used to construct the HTTP request's body.
-     */
-    readonly requestBody?: OperationParameter;
-    /**
-     * Whether or not this operation uses XML request and response bodies.
-     */
-    readonly isXML?: boolean;
-    /**
-     * The parameters to the operation method that will be substituted into the constructed URL.
-     */
-    readonly urlParameters?: ReadonlyArray<OperationURLParameter>;
-    /**
-     * The parameters to the operation method that will be added to the constructed URL's query.
-     */
-    readonly queryParameters?: ReadonlyArray<OperationQueryParameter>;
-    /**
-     * The parameters to the operation method that will be converted to headers on the operation's
-     * HTTP request.
-     */
-    readonly headerParameters?: ReadonlyArray<OperationParameter>;
-    /**
-     * The parameters to the operation method that will be used to create a formdata body for the
-     * operation's HTTP request.
-     */
-    readonly formDataParameters?: ReadonlyArray<OperationParameter>;
-    /**
-     * The different types of responses that this operation can return based on what status code is
-     * returned.
-     */
-    readonly responses: {
-        [responseCode: string]: OperationResponseMap;
-    };
+    passphrase?: string | undefined;
 }
 /**
- * Wrapper object for http request and response. Deserialized object is stored in
- * the `parsedBody` property when the response body is received in JSON or XML.
+ * An interface compatible with NodeJS's `tls.PxfObject`.
+ * We want to avoid publicly re-exporting the actual interface,
+ * since it might vary across runtime versions.
  */
-export interface FullOperationResponse extends PipelineResponse {
+export interface PxfObject {
     /**
-     * The parsed HTTP response headers.
+     * PFX or PKCS12 encoded private key and certificate chain.
      */
-    parsedHeaders?: {
-        [key: string]: unknown;
-    };
+    buf: string | NodeBuffer;
     /**
-     * The response body as parsed JSON or XML.
+     * Optional passphrase.
      */
-    parsedBody?: any;
-    /**
-     * The request that generated the response.
-     */
-    request: OperationRequest;
-}
-/**
- * A function to be called each time a response is received from the server
- * while performing the requested operation.
- * May be called multiple times.
- */
-export type RawResponseCallback = (rawResponse: FullOperationResponse, flatResponse: unknown, error?: unknown) => void;
-/**
- * Used to map raw response objects to final shapes.
- * Helps packing and unpacking Dates and other encoded types that are not intrinsic to JSON.
- * Also allows pulling values from headers, as well as inserting default values and constants.
- */
-export interface Serializer {
-    /**
-     * The provided model mapper.
-     */
-    readonly modelMappers: {
-        [key: string]: any;
-    };
-    /**
-     * Whether the contents are XML or not.
-     */
-    readonly isXML: boolean;
-    /**
-     * Validates constraints, if any. This function will throw if the provided value does not respect those constraints.
-     * @param mapper - The definition of data models.
-     * @param value - The value.
-     * @param objectName - Name of the object. Used in the error messages.
-     * @deprecated Removing the constraints validation on client side.
-     */
-    validateConstraints(mapper: Mapper, value: any, objectName: string): void;
-    /**
-     * Serialize the given object based on its metadata defined in the mapper.
-     *
-     * @param mapper - The mapper which defines the metadata of the serializable object.
-     * @param object - A valid Javascript object to be serialized.
-     * @param objectName - Name of the serialized object.
-     * @param options - additional options to deserialization.
-     * @returns A valid serialized Javascript object.
-     */
-    serialize(mapper: Mapper, object: any, objectName?: string, options?: SerializerOptions): any;
-    /**
-     * Deserialize the given object based on its metadata defined in the mapper.
-     *
-     * @param mapper - The mapper which defines the metadata of the serializable object.
-     * @param responseBody - A valid Javascript entity to be deserialized.
-     * @param objectName - Name of the deserialized object.
-     * @param options - Controls behavior of XML parser and builder.
-     * @returns A valid deserialized Javascript object.
-     */
-    deserialize(mapper: Mapper, responseBody: any, objectName: string, options?: SerializerOptions): any;
-}
-/**
- * Description of various value constraints such as integer ranges and string regex.
- */
-export interface MapperConstraints {
-    /**
-     * The value should be less than or equal to the `InclusiveMaximum` value.
-     */
-    InclusiveMaximum?: number;
-    /**
-     * The value should be less than the `ExclusiveMaximum` value.
-     */
-    ExclusiveMaximum?: number;
-    /**
-     * The value should be greater than or equal to the `InclusiveMinimum` value.
-     */
-    InclusiveMinimum?: number;
-    /**
-     * The value should be greater than the `InclusiveMinimum` value.
-     */
-    ExclusiveMinimum?: number;
-    /**
-     * The length should be smaller than the `MaxLength`.
-     */
-    MaxLength?: number;
-    /**
-     * The length should be bigger than the `MinLength`.
-     */
-    MinLength?: number;
-    /**
-     * The value must match the pattern.
-     */
-    Pattern?: RegExp;
-    /**
-     * The value must contain fewer items than the MaxItems value.
-     */
-    MaxItems?: number;
-    /**
-     * The value must contain more items than the `MinItems` value.
-     */
-    MinItems?: number;
-    /**
-     * The value must contain only unique items.
-     */
-    UniqueItems?: true;
-    /**
-     * The value should be exactly divisible by the `MultipleOf` value.
-     */
-    MultipleOf?: number;
-}
-/**
- * Type of the mapper. Includes known mappers.
- */
-export type MapperType = SimpleMapperType | CompositeMapperType | SequenceMapperType | DictionaryMapperType | EnumMapperType;
-/**
- * The type of a simple mapper.
- */
-export interface SimpleMapperType {
-    /**
-     * Name of the type of the property.
-     */
-    name: "Base64Url" | "Boolean" | "ByteArray" | "Date" | "DateTime" | "DateTimeRfc1123" | "Object" | "Stream" | "String" | "TimeSpan" | "UnixTime" | "Uuid" | "Number" | "any";
-}
-/**
- * Helps build a mapper that describes how to map a set of properties of an object based on other mappers.
- *
- * Only one of the following properties should be present: `className`, `modelProperties` and `additionalProperties`.
- */
-export interface CompositeMapperType {
-    /**
-     * Name of the composite mapper type.
-     */
-    name: "Composite";
-    /**
-     * Use `className` to reference another type definition.
-     */
-    className?: string;
-    /**
-     * Use `modelProperties` when the reference to the other type has been resolved.
-     */
-    modelProperties?: {
-        [propertyName: string]: Mapper;
-    };
-    /**
-     * Used when a model has `additionalProperties: true`. Allows the generic processing of unnamed model properties on the response object.
-     */
-    additionalProperties?: Mapper;
-    /**
-     * The name of the top-most parent scheme, the one that has no parents.
-     */
-    uberParent?: string;
-    /**
-     * A polymorphic discriminator.
-     */
-    polymorphicDiscriminator?: PolymorphicDiscriminator;
-}
-/**
- * Helps build a mapper that describes how to parse a sequence of mapped values.
- */
-export interface SequenceMapperType {
-    /**
-     * Name of the sequence type mapper.
-     */
-    name: "Sequence";
-    /**
-     * The mapper to use to map each one of the properties of the sequence.
-     */
-    element: Mapper;
-}
-/**
- * Helps build a mapper that describes how to parse a dictionary of mapped values.
- */
-export interface DictionaryMapperType {
-    /**
-     * Name of the sequence type mapper.
-     */
-    name: "Dictionary";
-    /**
-     * The mapper to use to map the value of each property in the dictionary.
-     */
-    value: Mapper;
-}
-/**
- * Helps build a mapper that describes how to parse an enum value.
- */
-export interface EnumMapperType {
-    /**
-     * Name of the enum type mapper.
-     */
-    name: "Enum";
-    /**
-     * Values allowed by this mapper.
-     */
-    allowedValues: any[];
-}
-/**
- * The base definition of a mapper. Can be used for XML and plain JavaScript objects.
- */
-export interface BaseMapper {
-    /**
-     * Name for the xml element
-     */
-    xmlName?: string;
-    /**
-     * Xml element namespace
-     */
-    xmlNamespace?: string;
-    /**
-     * Xml element namespace prefix
-     */
-    xmlNamespacePrefix?: string;
-    /**
-     * Determines if the current property should be serialized as an attribute of the parent xml element
-     */
-    xmlIsAttribute?: boolean;
-    /**
-     * Determines if the current property should be serialized as the inner content of the xml element
-     */
-    xmlIsMsText?: boolean;
-    /**
-     * Name for the xml elements when serializing an array
-     */
-    xmlElementName?: string;
-    /**
-     * Whether or not the current property should have a wrapping XML element
-     */
-    xmlIsWrapped?: boolean;
-    /**
-     * Whether or not the current property is readonly
-     */
-    readOnly?: boolean;
-    /**
-     * Whether or not the current property is a constant
-     */
-    isConstant?: boolean;
-    /**
-     * Whether or not the current property is required
-     */
-    required?: boolean;
-    /**
-     * Whether or not the current property allows mull as a value
-     */
-    nullable?: boolean;
-    /**
-     * The name to use when serializing
-     */
-    serializedName?: string;
-    /**
-     * Type of the mapper
-     */
-    type: MapperType;
-    /**
-     * Default value when one is not explicitly provided
-     */
-    defaultValue?: any;
-    /**
-     * Constraints to test the current value against
-     */
-    constraints?: MapperConstraints;
-}
-/**
- * Mappers are definitions of the data models used in the library.
- * These data models are part of the Operation or Client definitions in the responses or parameters.
- */
-export type Mapper = BaseMapper | CompositeMapper | SequenceMapper | DictionaryMapper | EnumMapper;
-/**
- * Used to disambiguate discriminated type unions.
- * For example, if response can have many shapes but also includes a 'kind' field (or similar),
- * that field can be used to determine how to deserialize the response to the correct type.
- */
-export interface PolymorphicDiscriminator {
-    /**
-     * Name of the discriminant property in the original JSON payload, e.g. `@odata.kind`.
-     */
-    serializedName: string;
-    /**
-     * Name to use on the resulting object instead of the original property name.
-     * Useful since the JSON property could be difficult to work with.
-     * For example: For a field received as `@odata.kind`, the final object could instead include a property simply named `kind`.
-     */
-    clientName: string;
-    /**
-     * It may contain any other property.
-     */
-    [key: string]: string;
-}
-/**
- * A mapper composed of other mappers.
- */
-export interface CompositeMapper extends BaseMapper {
-    /**
-     * The type descriptor of the `CompositeMapper`.
-     */
-    type: CompositeMapperType;
-}
-/**
- * A mapper describing arrays.
- */
-export interface SequenceMapper extends BaseMapper {
-    /**
-     * The type descriptor of the `SequenceMapper`.
-     */
-    type: SequenceMapperType;
-}
-/**
- * A mapper describing plain JavaScript objects used as key/value pairs.
- */
-export interface DictionaryMapper extends BaseMapper {
-    /**
-     * The type descriptor of the `DictionaryMapper`.
-     */
-    type: DictionaryMapperType;
-    /**
-     * Optionally, a prefix to add to the header collection.
-     */
-    headerCollectionPrefix?: string;
-}
-/**
- * A mapper describing an enum value.
- */
-export interface EnumMapper extends BaseMapper {
-    /**
-     * The type descriptor of the `EnumMapper`.
-     */
-    type: EnumMapperType;
-}
-export interface UrlParameterValue {
-    value: string;
-    skipUrlEncoding: boolean;
-}
-/**
- * Configuration for creating a new Tracing Span
- */
-export interface SpanConfig {
-    /**
-     * Package name prefix
-     */
-    packagePrefix: string;
-    /**
-     * Service namespace
-     */
-    namespace: string;
-}
-/**
- * Used to configure additional policies added to the pipeline at construction.
- */
-export interface AdditionalPolicyConfig {
-    /**
-     * A policy to be added.
-     */
-    policy: PipelinePolicy;
-    /**
-     * Determines if this policy be applied before or after retry logic.
-     * Only use `perRetry` if you need to modify the request again
-     * each time the operation is retried due to retryable service
-     * issues.
-     */
-    position: "perCall" | "perRetry";
-}
-/**
- * The common set of options that high level clients are expected to expose.
- */
-export interface CommonClientOptions extends PipelineOptions {
-    /**
-     * The HttpClient that will be used to send HTTP requests.
-     */
-    httpClient?: HttpClient;
-    /**
-     * Set to true if the request is sent over HTTP instead of HTTPS
-     */
-    allowInsecureConnection?: boolean;
-    /**
-     * Additional policies to include in the HTTP pipeline.
-     */
-    additionalPolicies?: AdditionalPolicyConfig[];
+    passphrase?: string | undefined;
 }
 //# sourceMappingURL=interfaces.d.ts.map
