@@ -1,106 +1,69 @@
-import { AbortSignalLike } from "@azure/abort-controller";
-import { LroError } from "../poller/models.js";
 /**
- * The potential location of the result of the LRO if specified by the LRO extension in the swagger.
+ * An interface that tracks the settings for paged iteration
  */
-export type LroResourceLocationConfig = "azure-async-operation" | "location" | "original-uri";
-/**
- * The type of a LRO response body. This is just a convenience type for checking the status of the operation.
- */
-export interface ResponseBody extends Record<string, unknown> {
-    /** The status of the operation. */
-    status?: unknown;
-    /** The state of the provisioning process */
-    provisioningState?: unknown;
-    /** The properties of the provisioning process */
-    properties?: {
-        provisioningState?: unknown;
-    } & Record<string, unknown>;
-    /** The error if the operation failed */
-    error?: Partial<LroError>;
-    /** The location of the created resource */
-    resourceLocation?: string;
+export interface PageSettings {
+    /**
+     * The token that keeps track of where to continue the iterator
+     */
+    continuationToken?: string;
+    /**
+     * The size of the page during paged iteration
+     */
+    maxPageSize?: number;
 }
 /**
- * Simple type of the raw response.
+ * An interface that allows async iterable iteration both to completion and by page.
  */
-export interface RawResponse {
-    /** The HTTP status code */
-    statusCode: number;
-    /** A HttpHeaders collection in the response represented as a simple JSON object where all header names have been normalized to be lower-case. */
-    headers: {
-        [headerName: string]: string;
-    };
-    /** The parsed response body */
-    body?: unknown;
+export interface PagedAsyncIterableIterator<TElement, TPage = TElement[], TPageSettings = PageSettings> {
+    /**
+     * The next method, part of the iteration protocol
+     */
+    next(): Promise<IteratorResult<TElement>>;
+    /**
+     * The connection to the async iterator, part of the iteration protocol
+     */
+    [Symbol.asyncIterator](): PagedAsyncIterableIterator<TElement, TPage, TPageSettings>;
+    /**
+     * Return an AsyncIterableIterator that works a page at a time
+     */
+    byPage: (settings?: TPageSettings) => AsyncIterableIterator<TPage>;
 }
 /**
- * The type of the response of a LRO.
+ * An interface that describes how to communicate with the service.
  */
-export interface LroResponse<T = unknown> {
-    /** The flattened response */
-    flatResponse: T;
-    /** The raw response */
-    rawResponse: RawResponse;
+export interface PagedResult<TPage, TPageSettings = PageSettings, TLink = string> {
+    /**
+     * Link to the first page of results.
+     */
+    firstPageLink: TLink;
+    /**
+     * A method that returns a page of results.
+     */
+    getPage: (pageLink: TLink, maxPageSize?: number) => Promise<{
+        page: TPage;
+        nextPageLink?: TLink;
+    } | undefined>;
+    /**
+     * a function to implement the `byPage` method on the paged async iterator. The default is
+     * one that sets the `maxPageSizeParam` from `settings.maxPageSize`.
+     */
+    byPage?: (settings?: TPageSettings) => AsyncIterableIterator<TPage>;
+    /**
+     * A function to extract elements from a page.
+     */
+    toElements?: (page: TPage) => unknown[];
 }
 /**
- * Description of a long running operation.
+ * Paged collection of T items
  */
-export interface LongRunningOperation<T = unknown> {
+export type Paged<T> = {
     /**
-     * The request path. This should be set if the operation is a PUT and needs
-     * to poll from the same request path.
+     * The T items on this page
      */
-    requestPath?: string;
+    value: T[];
     /**
-     * The HTTP request method. This should be set if the operation is a PUT or a
-     * DELETE.
+     * The link to the next page of items
      */
-    requestMethod?: string;
-    /**
-     * A function that can be used to send initial request to the service.
-     */
-    sendInitialRequest: () => Promise<LroResponse<unknown>>;
-    /**
-     * A function that can be used to poll for the current status of a long running operation.
-     */
-    sendPollRequest: (path: string, options?: {
-        abortSignal?: AbortSignalLike;
-    }) => Promise<LroResponse<T>>;
-}
-export type HttpOperationMode = "OperationLocation" | "ResourceLocation" | "Body";
-/**
- * Options for `createPoller`.
- */
-export interface CreateHttpPollerOptions<TResult, TState> {
-    /**
-     * Defines how much time the poller is going to wait before making a new request to the service.
-     */
-    intervalInMs?: number;
-    /**
-     * A serialized poller which can be used to resume an existing paused Long-Running-Operation.
-     */
-    restoreFrom?: string;
-    /**
-     * The potential location of the result of the LRO if specified by the LRO extension in the swagger.
-     */
-    resourceLocationConfig?: LroResourceLocationConfig;
-    /**
-     * A function to process the result of the LRO.
-     */
-    processResult?: (result: unknown, state: TState) => TResult;
-    /**
-     * A function to process the state of the LRO.
-     */
-    updateState?: (state: TState, response: LroResponse) => void;
-    /**
-     * A function to be called each time the operation location is updated by the
-     * service.
-     */
-    withOperationLocation?: (operationLocation: string) => void;
-    /**
-     * Control whether to throw an exception if the operation failed or was canceled.
-     */
-    resolveOnUnsuccessful?: boolean;
-}
+    nextLink?: string;
+};
 //# sourceMappingURL=models.d.ts.map
