@@ -1,455 +1,288 @@
-import type { AbortSignalLike } from "@azure/abort-controller";
-import type { OperationTracingOptions } from "@azure/core-tracing";
-import type { HttpMethods } from "@azure/core-util";
-import type { NodeBuffer, NodeReadableStream, WebReadableStream } from "@typespec/ts-http-runtime";
 /**
- * A HttpHeaders collection represented as a simple JSON object.
+ * A narrower version of TypeScript 4.5's Awaited type which Recursively
+ * unwraps the "awaited type", emulating the behavior of `await`.
  */
-export type RawHttpHeaders = {
-    [headerName: string]: string;
+export type Resolved<T> = T extends {
+    then(onfulfilled: infer F): any;
+} ? F extends (value: infer V) => any ? Resolved<V> : never : T;
+/**
+ * Represents a client that can integrate with the currently configured {@link Instrumenter}.
+ *
+ * Create an instance using {@link createTracingClient}.
+ */
+export interface TracingClient {
+    /**
+     * Wraps a callback in a tracing span, calls the callback, and closes the span.
+     *
+     * This is the primary interface for using Tracing and will handle error recording as well as setting the status on the span.
+     *
+     * Both synchronous and asynchronous functions will be awaited in order to reflect the result of the callback on the span.
+     *
+     * Example:
+     *
+     * ```ts snippet:ReadmeSampleWithSpanExample
+     * import { createTracingClient } from "@azure/core-tracing";
+     *
+     * const tracingClient = createTracingClient({
+     *   namespace: "test.namespace",
+     *   packageName: "test-package",
+     *   packageVersion: "1.0.0",
+     * });
+     *
+     * const options = {};
+     *
+     * const myOperationResult = await tracingClient.withSpan(
+     *   "myClassName.myOperationName",
+     *   options,
+     *   (updatedOptions) => {
+     *     // Do something with the updated options.
+     *     return "myOperationResult";
+     *   },
+     * );
+     * ```
+     * @param name - The name of the span. By convention this should be `${className}.${methodName}`.
+     * @param operationOptions - The original options passed to the method. The callback will receive these options with the newly created {@link TracingContext}.
+     * @param callback - The callback to be invoked with the updated options and newly created {@link TracingSpan}.
+     */
+    withSpan<Options extends {
+        tracingOptions?: OperationTracingOptions;
+    }, Callback extends (updatedOptions: Options, span: Omit<TracingSpan, "end">) => ReturnType<Callback>>(name: string, operationOptions: Options, callback: Callback, spanOptions?: TracingSpanOptions): Promise<Resolved<ReturnType<Callback>>>;
+    /**
+     * Starts a given span but does not set it as the active span.
+     *
+     * You must end the span using {@link TracingSpan.end}.
+     *
+     * Most of the time you will want to use {@link withSpan} instead.
+     *
+     * @param name - The name of the span. By convention this should be `${className}.${methodName}`.
+     * @param operationOptions - The original operation options.
+     * @param spanOptions - The options to use when creating the span.
+     *
+     * @returns A {@link TracingSpan} and the updated operation options.
+     */
+    startSpan<Options extends {
+        tracingOptions?: OperationTracingOptions;
+    }>(name: string, operationOptions?: Options, spanOptions?: TracingSpanOptions): {
+        span: TracingSpan;
+        updatedOptions: OptionsWithTracingContext<Options>;
+    };
+    /**
+     * Wraps a callback with an active context and calls the callback.
+     * Depending on the implementation, this may set the globally available active context.
+     *
+     * Useful when you want to leave the boundaries of the SDK (make a request or callback to user code) and are unable to use the {@link withSpan} API.
+     *
+     * @param context - The {@link TracingContext} to use as the active context in the scope of the callback.
+     * @param callback - The callback to be invoked with the given context set as the globally active context.
+     * @param callbackArgs - The callback arguments.
+     */
+    withContext<CallbackArgs extends unknown[], Callback extends (...args: CallbackArgs) => ReturnType<Callback>>(context: TracingContext, callback: Callback, ...callbackArgs: CallbackArgs): ReturnType<Callback>;
+    /**
+     * Parses a traceparent header value into a {@link TracingSpanContext}.
+     *
+     * @param traceparentHeader - The traceparent header to parse.
+     * @returns An implementation-specific identifier for the span.
+     */
+    parseTraceparentHeader(traceparentHeader: string): TracingContext | undefined;
+    /**
+     * Creates a set of request headers to propagate tracing information to a backend.
+     *
+     * @param tracingContext - The context containing the span to propagate.
+     * @returns The set of headers to add to a request.
+     */
+    createRequestHeaders(tracingContext?: TracingContext): Record<string, string>;
+}
+/**
+ * Options that can be passed to {@link createTracingClient}
+ */
+export interface TracingClientOptions {
+    /** The value of the az.namespace tracing attribute on newly created spans. */
+    namespace: string;
+    /** The name of the package invoking this trace. */
+    packageName: string;
+    /** An optional version of the package invoking this trace. */
+    packageVersion?: string;
+}
+/** The kind of span. */
+export type TracingSpanKind = "client" | "server" | "producer" | "consumer" | "internal";
+/** Options used to configure the newly created span. */
+export interface TracingSpanOptions {
+    /** The kind of span. Implementations should default this to "client". */
+    spanKind?: TracingSpanKind;
+    /** A collection of {@link TracingSpanLink} to link to this span. */
+    spanLinks?: TracingSpanLink[];
+    /** Initial set of attributes to set on a span. */
+    spanAttributes?: {
+        [key: string]: unknown;
+    };
+}
+/** A pointer from the current {@link TracingSpan} to another span in the same or a different trace. */
+export interface TracingSpanLink {
+    /** The {@link TracingContext} containing the span context to link to. */
+    tracingContext: TracingContext;
+    /** A set of attributes on the link. */
+    attributes?: {
+        [key: string]: unknown;
+    };
+}
+/**
+ * Represents an implementation agnostic instrumenter.
+ */
+export interface Instrumenter {
+    /**
+     * Creates a new {@link TracingSpan} with the given name and options and sets it on a new context.
+     * @param name - The name of the span. By convention this should be `${className}.${methodName}`.
+     * @param spanOptions - The options to use when creating the span.
+     *
+     * @returns A {@link TracingSpan} that can be used to end the span, and the context this span has been set on.
+     */
+    startSpan(name: string, spanOptions: InstrumenterSpanOptions): {
+        span: TracingSpan;
+        tracingContext: TracingContext;
+    };
+    /**
+     * Wraps a callback with an active context and calls the callback.
+     * Depending on the implementation, this may set the globally available active context.
+     *
+     * @param context - The {@link TracingContext} to use as the active context in the scope of the callback.
+     * @param callback - The callback to be invoked with the given context set as the globally active context.
+     * @param callbackArgs - The callback arguments.
+     */
+    withContext<CallbackArgs extends unknown[], Callback extends (...args: CallbackArgs) => ReturnType<Callback>>(context: TracingContext, callback: Callback, ...callbackArgs: CallbackArgs): ReturnType<Callback>;
+    /**
+     * Provides an implementation-specific method to parse a {@link https://www.w3.org/TR/trace-context/#traceparent-header}
+     * into a {@link TracingSpanContext} which can be used to link non-parented spans together.
+     */
+    parseTraceparentHeader(traceparentHeader: string): TracingContext | undefined;
+    /**
+     * Provides an implementation-specific method to serialize a {@link TracingSpan} to a set of headers.
+     * @param tracingContext - The context containing the span to serialize.
+     */
+    createRequestHeaders(tracingContext?: TracingContext): Record<string, string>;
+}
+/**
+ * Options passed to {@link Instrumenter.startSpan} as a superset of {@link TracingSpanOptions}.
+ */
+export interface InstrumenterSpanOptions extends TracingSpanOptions {
+    /** The name of the package invoking this trace. */
+    packageName: string;
+    /** The version of the package invoking this trace. */
+    packageVersion?: string;
+    /** The current tracing context. Defaults to an implementation-specific "active" context. */
+    tracingContext?: TracingContext;
+}
+/**
+ * Status representing a successful operation that can be sent to {@link TracingSpan.setStatus}
+ */
+export type SpanStatusSuccess = {
+    status: "success";
 };
 /**
- * A HttpHeaders collection for input, represented as a simple JSON object.
+ * Status representing an error that can be sent to {@link TracingSpan.setStatus}
  */
-export type RawHttpHeadersInput = Record<string, string | number | boolean>;
+export type SpanStatusError = {
+    status: "error";
+    error?: Error | string;
+};
 /**
- * Represents a set of HTTP headers on a request/response.
- * Header names are treated as case insensitive.
+ * Represents the statuses that can be passed to {@link TracingSpan.setStatus}.
+ *
+ * By default, all spans will be created with status "unset".
  */
-export interface HttpHeaders extends Iterable<[string, string]> {
+export type SpanStatus = SpanStatusSuccess | SpanStatusError;
+/**
+ * Represents options you can pass to {@link TracingSpan.addEvent}.
+ */
+export interface AddEventOptions {
     /**
-     * Returns the value of a specific header or undefined if not set.
-     * @param name - The name of the header to retrieve.
+     * A set of attributes to attach to the event.
      */
-    get(name: string): string | undefined;
+    attributes?: Record<string, unknown>;
     /**
-     * Returns true if the specified header exists.
-     * @param name - The name of the header to check.
+     * The start time of the event.
      */
-    has(name: string): boolean;
-    /**
-     * Sets a specific header with a given value.
-     * @param name - The name of the header to set.
-     * @param value - The value to use for the header.
-     */
-    set(name: string, value: string | number | boolean): void;
-    /**
-     * Removes a specific header from the collection.
-     * @param name - The name of the header to delete.
-     */
-    delete(name: string): void;
-    /**
-     * Accesses a raw JS object that acts as a simple map
-     * of header names to values.
-     */
-    toJSON(options?: {
-        preserveCase?: boolean;
-    }): RawHttpHeaders;
+    startTime?: Date;
 }
 /**
- * A part of the request body in a multipart request.
+ * Represents an implementation agnostic tracing span.
  */
-export interface BodyPart {
+export interface TracingSpan {
     /**
-     * The headers for this part of the multipart request.
-     */
-    headers: HttpHeaders;
-    /**
-     * The body of this part of the multipart request.
-     */
-    body: ((() => WebReadableStream<Uint8Array>) | (() => NodeReadableStream)) | WebReadableStream<Uint8Array> | NodeReadableStream | Uint8Array | Blob;
-}
-/**
- * A request body consisting of multiple parts.
- */
-export interface MultipartRequestBody {
-    /**
-     * The parts of the request body.
-     */
-    parts: BodyPart[];
-    /**
-     * The boundary separating each part of the request body.
-     * If not specified, a random boundary will be generated.
+     * Sets the status of the span. When an error is provided, it will be recorded on the span as well.
      *
-     * When specified, '--' will be prepended to the boundary in the request to ensure the boundary follows the specification.
+     * @param status - The {@link SpanStatus} to set on the span.
      */
-    boundary?: string;
+    setStatus(status: SpanStatus): void;
+    /**
+     * Sets a given attribute on a span.
+     *
+     * @param name - The attribute's name.
+     * @param value - The attribute's value to set. May be any non-nullish value.
+     */
+    setAttribute(name: string, value: unknown): void;
+    /**
+     * Ends the span.
+     */
+    end(): void;
+    /**
+     * Records an exception on a {@link TracingSpan} without modifying its status.
+     *
+     * When recording an unhandled exception that should fail the span, please use {@link TracingSpan.setStatus} instead.
+     *
+     * @param exception - The exception to record on the span.
+     *
+     */
+    recordException(exception: Error | string): void;
+    /**
+     * Returns true if this {@link TracingSpan} is recording information.
+     *
+     * Depending on the span implementation, this may return false if the span is not being sampled.
+     */
+    isRecording(): boolean;
+    /**
+     * Adds an event to the span.
+     */
+    addEvent?(name: string, options?: AddEventOptions): void;
+}
+/** An immutable context bag of tracing values for the current operation. */
+export interface TracingContext {
+    /**
+     * Sets a given object on a context.
+     * @param key - The key of the given context value.
+     * @param value - The value to set on the context.
+     *
+     * @returns - A new context with the given value set.
+     */
+    setValue(key: symbol, value: unknown): TracingContext;
+    /**
+     * Gets an object from the context if it exists.
+     * @param key - The key of the given context value.
+     *
+     * @returns - The value of the given context value if it exists, otherwise `undefined`.
+     */
+    getValue(key: symbol): unknown;
+    /**
+     * Deletes an object from the context if it exists.
+     * @param key - The key of the given context value to delete.
+     */
+    deleteValue(key: symbol): TracingContext;
 }
 /**
- * Types of bodies supported on the request.
- * NodeReadableStream and () =\> NodeReadableStream is Node only.
- * Blob, WebReadableStream<Uint8Array>, and () =\> WebReadableStream<Uint8Array> are browser only.
+ * Tracing options to set on an operation.
  */
-export type RequestBodyType = NodeReadableStream | (() => NodeReadableStream) | WebReadableStream<Uint8Array> | (() => WebReadableStream<Uint8Array>) | Blob | ArrayBuffer | ArrayBufferView | FormData | string | null;
-/**
- * An interface compatible with NodeJS's `http.Agent`.
- * We want to avoid publicly re-exporting the actual interface,
- * since it might vary across runtime versions.
- */
-export interface Agent {
-    /**
-     * Destroy any sockets that are currently in use by the agent.
-     */
-    destroy(): void;
-    /**
-     * For agents with keepAlive enabled, this sets the maximum number of sockets that will be left open in the free state.
-     */
-    maxFreeSockets: number;
-    /**
-     * Determines how many concurrent sockets the agent can have open per origin.
-     */
-    maxSockets: number;
-    /**
-     * An object which contains queues of requests that have not yet been assigned to sockets.
-     */
-    requests: unknown;
-    /**
-     * An object which contains arrays of sockets currently in use by the agent.
-     */
-    sockets: unknown;
+export interface OperationTracingOptions {
+    /** The context to use for created Tracing Spans. */
+    tracingContext?: TracingContext;
 }
 /**
- * Metadata about a request being made by the pipeline.
+ * A utility type for when we know a TracingContext has been set
+ * as part of an operation's options.
  */
-export interface PipelineRequest {
-    /**
-     * The URL to make the request to.
-     */
-    url: string;
-    /**
-     * The HTTP method to use when making the request.
-     */
-    method: HttpMethods;
-    /**
-     * The HTTP headers to use when making the request.
-     */
-    headers: HttpHeaders;
-    /**
-     * The number of milliseconds a request can take before automatically being terminated.
-     * If the request is terminated, an `AbortError` is thrown.
-     * Defaults to 0, which disables the timeout.
-     */
-    timeout: number;
-    /**
-     * Indicates whether the user agent should send cookies from the other domain in the case of cross-origin requests.
-     * Defaults to false.
-     */
-    withCredentials: boolean;
-    /**
-     * A unique identifier for the request. Used for logging and tracing.
-     */
-    requestId: string;
-    /**
-     * The HTTP body content (if any)
-     */
-    body?: RequestBodyType;
-    /**
-     * Body for a multipart request.
-     */
-    multipartBody?: MultipartRequestBody;
-    /**
-     * To simulate a browser form post
-     */
-    formData?: FormDataMap;
-    /**
-     * A list of response status codes whose corresponding PipelineResponse body should be treated as a stream.
-     * When streamResponseStatusCodes contains the value Number.POSITIVE_INFINITY any status would be treated as a stream.
-     */
-    streamResponseStatusCodes?: Set<number>;
-    /**
-     * Proxy configuration.
-     */
-    proxySettings?: ProxySettings;
-    /**
-     * If the connection should not be reused.
-     */
-    disableKeepAlive?: boolean;
-    /**
-     * Used to abort the request later.
-     */
-    abortSignal?: AbortSignalLike;
-    /**
-     * Tracing options to use for any created Spans.
-     */
+export type OptionsWithTracingContext<Options extends {
     tracingOptions?: OperationTracingOptions;
-    /**
-     * Callback which fires upon upload progress.
-     */
-    onUploadProgress?: (progress: TransferProgressEvent) => void;
-    /** Callback which fires upon download progress. */
-    onDownloadProgress?: (progress: TransferProgressEvent) => void;
-    /** Set to true if the request is sent over HTTP instead of HTTPS */
-    allowInsecureConnection?: boolean;
-    /**
-     * NODEJS ONLY
-     *
-     * A Node-only option to provide a custom `http.Agent`/`https.Agent`.
-     * Does nothing when running in the browser.
-     */
-    agent?: Agent;
-    /**
-     * BROWSER ONLY
-     *
-     * A browser only option to enable browser Streams. If this option is set and a response is a stream
-     * the response will have a property `browserStream` instead of `blobBody` which will be undefined.
-     *
-     * Default value is false
-     */
-    enableBrowserStreams?: boolean;
-    /** Settings for configuring TLS authentication */
-    tlsSettings?: TlsSettings;
-    /**
-     * Additional options to set on the request. This provides a way to override
-     * existing ones or provide request properties that are not declared.
-     *
-     * For possible valid properties, see
-     *   - NodeJS https.request options:  https://nodejs.org/api/http.html#httprequestoptions-callback
-     *   - Browser RequestInit: https://developer.mozilla.org/en-US/docs/Web/API/RequestInit
-     *
-     * WARNING: Options specified here will override any properties of same names when request is sent by {@link HttpClient}.
-     */
-    requestOverrides?: Record<string, unknown>;
-}
-/**
- * Metadata about a response received by the pipeline.
- */
-export interface PipelineResponse {
-    /**
-     * The request that generated this response.
-     */
-    request: PipelineRequest;
-    /**
-     * The HTTP status code of the response.
-     */
-    status: number;
-    /**
-     * The HTTP response headers.
-     */
-    headers: HttpHeaders;
-    /**
-     * The response body as text (string format)
-     */
-    bodyAsText?: string | null;
-    /**
-     * BROWSER ONLY
-     *
-     * The response body as a browser Blob.
-     * Always undefined in node.js.
-     */
-    blobBody?: Promise<Blob>;
-    /**
-     * BROWSER ONLY
-     *
-     * The response body as a browser ReadableStream.
-     * Always undefined in node.js.
-     */
-    browserStreamBody?: WebReadableStream<Uint8Array>;
-    /**
-     * NODEJS ONLY
-     *
-     * The response body as a node.js Readable stream.
-     * Always undefined in the browser.
-     */
-    readableStreamBody?: NodeReadableStream;
-}
-/**
- * A simple interface for making a pipeline request and receiving a response.
- */
-export type SendRequest = (request: PipelineRequest) => Promise<PipelineResponse>;
-/**
- * The required interface for a client that makes HTTP requests
- * on behalf of a pipeline.
- */
-export interface HttpClient {
-    /**
-     * The method that makes the request and returns a response.
-     */
-    sendRequest: SendRequest;
-}
-/**
- * Fired in response to upload or download progress.
- */
-export type TransferProgressEvent = {
-    /**
-     * The number of bytes loaded so far.
-     */
-    loadedBytes: number;
+}> = Options & {
+    tracingOptions: {
+        tracingContext: TracingContext;
+    };
 };
-/**
- * Options to configure a proxy for outgoing requests (Node.js only).
- */
-export interface ProxySettings {
-    /**
-     * The proxy's host address.
-     * Must include the protocol (e.g., http:// or https://).
-     */
-    host: string;
-    /**
-     * The proxy host's port.
-     */
-    port: number;
-    /**
-     * The user name to authenticate with the proxy, if required.
-     */
-    username?: string;
-    /**
-     * The password to authenticate with the proxy, if required.
-     */
-    password?: string;
-}
-/**
- * Each form data entry can be a string, Blob, or a File. If you wish to pass a file with a name but do not have
- * access to the File class, you can use the createFile helper to create one.
- */
-export type FormDataValue = string | Blob | File;
-/**
- * A simple object that provides form data, as if from a browser form.
- */
-export type FormDataMap = {
-    [key: string]: FormDataValue | FormDataValue[];
-};
-/**
- * Options that control how to retry failed requests.
- */
-export interface PipelineRetryOptions {
-    /**
-     * The maximum number of retry attempts. Defaults to 3.
-     */
-    maxRetries?: number;
-    /**
-     * The amount of delay in milliseconds between retry attempts. Defaults to 1000
-     * (1 second). The delay increases exponentially with each retry up to a maximum
-     * specified by maxRetryDelayInMs.
-     */
-    retryDelayInMs?: number;
-    /**
-     * The maximum delay in milliseconds allowed before retrying an operation. Defaults
-     * to 64000 (64 seconds).
-     */
-    maxRetryDelayInMs?: number;
-}
-/**
- * Represents a certificate credential for authentication.
- */
-export interface CertificateCredential {
-    /**
-     * Optionally override the trusted CA certificates. Default is to trust
-     * the well-known CAs curated by Mozilla. Mozilla's CAs are completely
-     * replaced when CAs are explicitly specified using this option.
-     */
-    ca?: string | NodeBuffer | Array<string | NodeBuffer> | undefined;
-    /**
-     *  Cert chains in PEM format. One cert chain should be provided per
-     *  private key. Each cert chain should consist of the PEM formatted
-     *  certificate for a provided private key, followed by the PEM
-     *  formatted intermediate certificates (if any), in order, and not
-     *  including the root CA (the root CA must be pre-known to the peer,
-     *  see ca). When providing multiple cert chains, they do not have to
-     *  be in the same order as their private keys in key. If the
-     *  intermediate certificates are not provided, the peer will not be
-     *  able to validate the certificate, and the handshake will fail.
-     */
-    cert?: string | NodeBuffer | Array<string | NodeBuffer> | undefined;
-    /**
-     * Private keys in PEM format. PEM allows the option of private keys
-     * being encrypted. Encrypted keys will be decrypted with
-     * options.passphrase. Multiple keys using different algorithms can be
-     * provided either as an array of unencrypted key strings or buffers,
-     * or an array of objects in the form `{pem: <string|buffer>[,passphrase: <string>]}`.
-     * The object form can only occur in an array.object.passphrase is optional.
-     * Encrypted keys will be decrypted with object.passphrase if provided, or options.passphrase if it is not.
-     */
-    key?: string | NodeBuffer | Array<NodeBuffer | KeyObject> | undefined;
-    /**
-     * Shared passphrase used for a single private key and/or a PFX.
-     */
-    passphrase?: string | undefined;
-    /**
-     * PFX or PKCS12 encoded private key and certificate chain. pfx is an
-     * alternative to providing key and cert individually. PFX is usually
-     * encrypted, if it is, passphrase will be used to decrypt it. Multiple
-     * PFX can be provided either as an array of unencrypted PFX buffers,
-     * or an array of objects in the form `{buf: <string|buffer>[,passphrase: <string>]}`.
-     * The object form can only occur in an array.object.passphrase is optional.
-     * Encrypted PFX will be decrypted with object.passphrase if provided, or options.passphrase if it is not.
-     */
-    pfx?: string | NodeBuffer | Array<string | NodeBuffer | PxfObject> | undefined;
-}
-/**
- * Represents a certificate for TLS authentication.
- */
-export interface TlsSettings {
-    /**
-     * Optionally override the trusted CA certificates. Default is to trust
-     * the well-known CAs curated by Mozilla. Mozilla's CAs are completely
-     * replaced when CAs are explicitly specified using this option.
-     */
-    ca?: string | NodeBuffer | Array<string | NodeBuffer> | undefined;
-    /**
-     *  Cert chains in PEM format. One cert chain should be provided per
-     *  private key. Each cert chain should consist of the PEM formatted
-     *  certificate for a provided private key, followed by the PEM
-     *  formatted intermediate certificates (if any), in order, and not
-     *  including the root CA (the root CA must be pre-known to the peer,
-     *  see ca). When providing multiple cert chains, they do not have to
-     *  be in the same order as their private keys in key. If the
-     *  intermediate certificates are not provided, the peer will not be
-     *  able to validate the certificate, and the handshake will fail.
-     */
-    cert?: string | NodeBuffer | Array<string | NodeBuffer> | undefined;
-    /**
-     * Private keys in PEM format. PEM allows the option of private keys
-     * being encrypted. Encrypted keys will be decrypted with
-     * options.passphrase. Multiple keys using different algorithms can be
-     * provided either as an array of unencrypted key strings or buffers,
-     * or an array of objects in the form `{pem: <string|buffer>[,passphrase: <string>]}`.
-     * The object form can only occur in an array.object.passphrase is optional.
-     * Encrypted keys will be decrypted with object.passphrase if provided, or options.passphrase if it is not.
-     */
-    key?: string | NodeBuffer | Array<NodeBuffer | KeyObject> | undefined;
-    /**
-     * Shared passphrase used for a single private key and/or a PFX.
-     */
-    passphrase?: string | undefined;
-    /**
-     * PFX or PKCS12 encoded private key and certificate chain. pfx is an
-     * alternative to providing key and cert individually. PFX is usually
-     * encrypted, if it is, passphrase will be used to decrypt it. Multiple
-     * PFX can be provided either as an array of unencrypted PFX buffers,
-     * or an array of objects in the form `{buf: <string|buffer>[,passphrase: <string>]}`.
-     * The object form can only occur in an array.object.passphrase is optional.
-     * Encrypted PFX will be decrypted with object.passphrase if provided, or options.passphrase if it is not.
-     */
-    pfx?: string | NodeBuffer | Array<string | NodeBuffer | PxfObject> | undefined;
-}
-/**
- * An interface compatible with NodeJS's `tls.KeyObject`.
- * We want to avoid publicly re-exporting the actual interface,
- * since it might vary across runtime versions.
- */
-export interface KeyObject {
-    /**
-     * Private keys in PEM format.
-     */
-    pem: string | NodeBuffer;
-    /**
-     * Optional passphrase.
-     */
-    passphrase?: string | undefined;
-}
-/**
- * An interface compatible with NodeJS's `tls.PxfObject`.
- * We want to avoid publicly re-exporting the actual interface,
- * since it might vary across runtime versions.
- */
-export interface PxfObject {
-    /**
-     * PFX or PKCS12 encoded private key and certificate chain.
-     */
-    buf: string | NodeBuffer;
-    /**
-     * Optional passphrase.
-     */
-    passphrase?: string | undefined;
-}
 //# sourceMappingURL=interfaces.d.ts.map

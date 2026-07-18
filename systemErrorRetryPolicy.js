@@ -1,34 +1,17 @@
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-var systemErrorRetryPolicy_exports = {};
-__export(systemErrorRetryPolicy_exports, {
-  systemErrorRetryPolicy: () => systemErrorRetryPolicy,
-  systemErrorRetryPolicyName: () => systemErrorRetryPolicyName
-});
-module.exports = __toCommonJS(systemErrorRetryPolicy_exports);
-var import_policies = require("@typespec/ts-http-runtime/internal/policies");
-const systemErrorRetryPolicyName = import_policies.systemErrorRetryPolicyName;
-function systemErrorRetryPolicy(options = {}) {
-  return (0, import_policies.systemErrorRetryPolicy)(options);
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+import { systemErrorRetryPolicy as tspSystemErrorRetryPolicy, systemErrorRetryPolicyName as tspSystemErrorRetryPolicyName, } from "@typespec/ts-http-runtime/internal/policies";
+/**
+ * Name of the {@link systemErrorRetryPolicy}
+ */
+export const systemErrorRetryPolicyName = tspSystemErrorRetryPolicyName;
+/**
+ * A retry policy that specifically seeks to handle errors in the
+ * underlying transport layer (e.g. DNS lookup failures) rather than
+ * retryable error codes from the server itself.
+ * @param options - Options that customize the policy.
+ */
+export function systemErrorRetryPolicy(options = {}) {
+    return tspSystemErrorRetryPolicy(options);
 }
-// Annotate the CommonJS export names for ESM import in node:
-0 && (module.exports = {
-  systemErrorRetryPolicy,
-  systemErrorRetryPolicyName
-});
 //# sourceMappingURL=systemErrorRetryPolicy.js.map

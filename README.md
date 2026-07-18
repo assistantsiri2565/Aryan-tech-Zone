@@ -1,61 +1,35 @@
-# Azure Core Paging client library for JavaScript
+# Azure Core tracing library for JavaScript
 
-This library provides core types for paging async iterable iterators.
+This is the core tracing library that provides low-level interfaces and helper methods for tracing in Azure SDK JavaScript libraries which work in the browser and Node.js.
 
 ## Getting started
 
 ### Installation
 
-If using this as part of another project in the [azure-sdk-for-js](https://github.com/Azure/azure-sdk-for-js) repo,
-then run `rush install` after cloning the repo.
+This package is primarily used in Azure client libraries and not meant to be used directly by consumers of Azure SDKs.
 
-Otherwise, use npm to install this package in your application as follows
+## Key Concepts
 
-```javascript
-npm install @azure/core-paging
-```
-
-## Key concepts
-
-You can find an explanation of how this repository's code works by going to our [architecture overview](https://github.com/Azure/ms-rest-js/blob/master/docs/architectureOverview.md).
+- `TracingClient` is the primary interface providing tracing functionality to client libraries. Client libraries should only be aware of and interact with a `TracingClient` instance.
+  - A `TracingClient` implementation can be created using the `createTracingClient` factory function.
+- `Instrumenter` provides an abstraction over an instrumentation and acts as the interop point for using third party libraries like OpenTelemetry. By default, a no-op `Instrumenter` is used. Customers who wish to enable `OpenTelemetry` based tracing will do so by installing and registering the [@azure/opentelemetry-instrumentation-azure-sdk] package.
+- `TracingContext` is an **immutable** data container, used to pass operation-specific information around (such as span parenting information).
+- `TracingSpan` is an abstraction of a `Span` which can be used to record events, attributes, and exceptions.
 
 ## Examples
 
-Example of building with the types:
-
-```typescript
-  public listSecrets(
-    options: ListSecretsOptions = {}
-  ): PagedAsyncIterableIterator<SecretAttributes> {
-    const iter = this.listSecretsAll(options);
-    return {
-      async next() { return iter.next(); },
-      [Symbol.asyncIterator]() { return this; },
-      byPage: (settings: PageSettings = {}) => this.listSecretsPage(settings, options),
-    };
-  }
-```
-
-And using the types:
-
-```
-  for await (let page of client.listSecrets().byPage({ maxPageSize: 2 })) {
-    for (const secret of page) {
-      console.log("secret: ", secret);
-    }
-  }
-```
+Examples can be found in the `samples` folder.
 
 ## Next steps
 
-Try out this package in your application when dealing with async iterable iterators and provide feedback!
+You can build and run the tests locally by executing `npm run test`. Explore the `test` folder to see advanced usage and behavior of the public classes.
 
 ## Troubleshooting
 
-Log an issue at https://github.com/Azure/azure-sdk-for-js/issues
+If you run into issues while using this library, please feel free to [file an issue](https://github.com/Azure/azure-sdk-for-js/issues/new).
 
 ## Contributing
 
 If you'd like to contribute to this library, please read the [contributing guide](https://github.com/Azure/azure-sdk-for-js/blob/main/CONTRIBUTING.md) to learn more about how to build and test the code.
 
-![Impressions](https://azure-sdk-impressions.azurewebsites.net/api/impressions/azure-sdk-for-js%2Fsdk%2Fcore%2Fcore-paging%2FREADME.png)
+[@azure/opentelemetry-instrumentation-azure-sdk]: https://www.npmjs.com/package/@azure/opentelemetry-instrumentation-azure-sdk

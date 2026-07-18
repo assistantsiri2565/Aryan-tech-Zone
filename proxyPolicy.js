@@ -1,39 +1,28 @@
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-var proxyPolicy_exports = {};
-__export(proxyPolicy_exports, {
-  getDefaultProxySettings: () => getDefaultProxySettings,
-  proxyPolicy: () => proxyPolicy,
-  proxyPolicyName: () => proxyPolicyName
-});
-module.exports = __toCommonJS(proxyPolicy_exports);
-var import_policies = require("@typespec/ts-http-runtime/internal/policies");
-const proxyPolicyName = import_policies.proxyPolicyName;
-function getDefaultProxySettings(proxyUrl) {
-  return (0, import_policies.getDefaultProxySettings)(proxyUrl);
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+import { proxyPolicy as tspProxyPolicy, proxyPolicyName as tspProxyPolicyName, getDefaultProxySettings as tspGetDefaultProxySettings, } from "@typespec/ts-http-runtime/internal/policies";
+/**
+ * The programmatic identifier of the proxyPolicy.
+ */
+export const proxyPolicyName = tspProxyPolicyName;
+/**
+ * This method converts a proxy url into `ProxySettings` for use with ProxyPolicy.
+ * If no argument is given, it attempts to parse a proxy URL from the environment
+ * variables `HTTPS_PROXY` or `HTTP_PROXY`.
+ * @param proxyUrl - The url of the proxy to use. May contain authentication information.
+ * @deprecated - Internally this method is no longer necessary when setting proxy information.
+ */
+export function getDefaultProxySettings(proxyUrl) {
+    return tspGetDefaultProxySettings(proxyUrl);
 }
-function proxyPolicy(proxySettings, options) {
-  return (0, import_policies.proxyPolicy)(proxySettings, options);
+/**
+ * A policy that allows one to apply proxy settings to all requests.
+ * If not passed static settings, they will be retrieved from the HTTPS_PROXY
+ * or HTTP_PROXY environment variables.
+ * @param proxySettings - ProxySettings to use on each request.
+ * @param options - additional settings, for example, custom NO_PROXY patterns
+ */
+export function proxyPolicy(proxySettings, options) {
+    return tspProxyPolicy(proxySettings, options);
 }
-// Annotate the CommonJS export names for ESM import in node:
-0 && (module.exports = {
-  getDefaultProxySettings,
-  proxyPolicy,
-  proxyPolicyName
-});
 //# sourceMappingURL=proxyPolicy.js.map
