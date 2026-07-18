@@ -1,12 +1,18 @@
+"use strict";
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.isPrimitiveBody = isPrimitiveBody;
+exports.isDuration = isDuration;
+exports.isValidUuid = isValidUuid;
+exports.flattenResponse = flattenResponse;
 /**
  * A type guard for a primitive response body.
  * @param value - Value to test
  *
  * @internal
  */
-export function isPrimitiveBody(value, mapperTypeName) {
+function isPrimitiveBody(value, mapperTypeName) {
     return (mapperTypeName !== "Composite" &&
         mapperTypeName !== "Dictionary" &&
         (typeof value === "string" ||
@@ -23,7 +29,7 @@ const validateISODuration = /^(-|\+)?P(?:([-+]?[0-9,.]*)Y)?(?:([-+]?[0-9,.]*)M)?
  * @param value - The value to be validated for ISO 8601 duration format.
  * @internal
  */
-export function isDuration(value) {
+function isDuration(value) {
     return validateISODuration.test(value);
 }
 const validUuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/i;
@@ -34,7 +40,7 @@ const validUuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F
  *
  * @internal
  */
-export function isValidUuid(uuid) {
+function isValidUuid(uuid) {
     return validUuidRegex.test(uuid);
 }
 /**
@@ -74,7 +80,7 @@ function handleNullableResponseAndWrappableBody(responseObject) {
  *
  * @internal
  */
-export function flattenResponse(fullResponse, responseSpec) {
+function flattenResponse(fullResponse, responseSpec) {
     const parsedHeaders = fullResponse.parsedHeaders;
     // head methods never have a body, but we return a boolean set to body property
     // to indicate presence/absence of the resource

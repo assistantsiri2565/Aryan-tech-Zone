@@ -1,19 +1,15 @@
-"use strict";
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.getStreamingResponseStatusCodes = getStreamingResponseStatusCodes;
-exports.getPathStringFromParameter = getPathStringFromParameter;
-const serializer_js_1 = require("./serializer.js");
+import { MapperTypeNames } from "./serializer.js";
 /**
  * Gets the list of status codes for streaming responses.
  * @internal
  */
-function getStreamingResponseStatusCodes(operationSpec) {
+export function getStreamingResponseStatusCodes(operationSpec) {
     const result = new Set();
     for (const [statusCode, operationResponse] of Object.entries(operationSpec.responses)) {
         if (operationResponse.bodyMapper &&
-            operationResponse.bodyMapper.type.name === serializer_js_1.MapperTypeNames.Stream) {
+            operationResponse.bodyMapper.type.name === MapperTypeNames.Stream) {
             result.add(Number(statusCode));
         }
     }
@@ -25,7 +21,7 @@ function getStreamingResponseStatusCodes(operationSpec) {
  * @returns The path to this parameter's value as a dotted string.
  * @internal
  */
-function getPathStringFromParameter(parameter) {
+export function getPathStringFromParameter(parameter) {
     const { parameterPath, mapper } = parameter;
     let result;
     if (typeof parameterPath === "string") {

@@ -1,8 +1,5 @@
-"use strict";
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.authorizeRequestOnTenantChallenge = void 0;
 /**
  * A set of constants used internally when processing requests.
  */
@@ -26,7 +23,7 @@ function isUuid(text) {
  * This implements the bearer challenge process described here: https://learn.microsoft.com/rest/api/storageservices/authorize-with-azure-active-directory#bearer-challenge
  * Handling has specific features for storage that departs to the general AAD challenge docs.
  **/
-const authorizeRequestOnTenantChallenge = async (challengeOptions) => {
+export const authorizeRequestOnTenantChallenge = async (challengeOptions) => {
     const requestOptions = requestToOptions(challengeOptions.request);
     const challenge = getChallenge(challengeOptions.response);
     if (challenge) {
@@ -48,7 +45,6 @@ const authorizeRequestOnTenantChallenge = async (challengeOptions) => {
     }
     return false;
 };
-exports.authorizeRequestOnTenantChallenge = authorizeRequestOnTenantChallenge;
 /**
  * Extracts the tenant id from the challenge information
  * The tenant id is contained in the authorization_uri as the first

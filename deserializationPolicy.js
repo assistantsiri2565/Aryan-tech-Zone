@@ -1,23 +1,19 @@
-"use strict";
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.deserializationPolicyName = void 0;
-exports.deserializationPolicy = deserializationPolicy;
-const interfaces_js_1 = require("./interfaces.js");
-const core_rest_pipeline_1 = require("@azure/core-rest-pipeline");
-const serializer_js_1 = require("./serializer.js");
-const operationHelpers_js_1 = require("./operationHelpers.js");
+import { XML_CHARKEY } from "./interfaces.js";
+import { RestError } from "@azure/core-rest-pipeline";
+import { MapperTypeNames } from "./serializer.js";
+import { getOperationRequestInfo } from "./operationHelpers.js";
 const defaultJsonContentTypes = ["application/json", "text/json"];
 const defaultXmlContentTypes = ["application/xml", "application/atom+xml"];
 /**
  * The programmatic identifier of the deserializationPolicy.
  */
-exports.deserializationPolicyName = "deserializationPolicy";
+export const deserializationPolicyName = "deserializationPolicy";
 /**
  * This policy handles parsing out responses according to OperationSpecs on the request.
  */
-function deserializationPolicy(options = {}) {
+export function deserializationPolicy(options = {}) {
     const jsonContentTypes = options.expectedContentTypes?.json ?? defaultJsonContentTypes;
     const xmlContentTypes = options.expectedContentTypes?.xml ?? defaultXmlContentTypes;
     const parseXML = options.parseXML;
@@ -26,11 +22,11 @@ function deserializationPolicy(options = {}) {
         xml: {
             rootName: serializerOptions?.xml.rootName ?? "",
             includeRoot: serializerOptions?.xml.includeRoot ?? false,
-            xmlCharKey: serializerOptions?.xml.xmlCharKey ?? interfaces_js_1.XML_CHARKEY,
+            xmlCharKey: serializerOptions?.xml.xmlCharKey ?? XML_CHARKEY,
         },
     };
     return {
-        name: exports.deserializationPolicyName,
+        name: deserializationPolicyName,
         async sendRequest(request, next) {
             const response = await next(request);
             return deserializeResponseBody(jsonContentTypes, xmlContentTypes, response, updatedOptions, parseXML);
@@ -40,7 +36,7 @@ function deserializationPolicy(options = {}) {
 function getOperationResponseMap(parsedResponse) {
     let result;
     const request = parsedResponse.request;
-    const operationInfo = (0, operationHelpers_js_1.getOperationRequestInfo)(request);
+    const operationInfo = getOperationRequestInfo(request);
     const operationSpec = operationInfo?.operationSpec;
     if (operationSpec) {
         if (!operationInfo?.operationResponseGetter) {
@@ -54,7 +50,7 @@ function getOperationResponseMap(parsedResponse) {
 }
 function shouldDeserializeResponse(parsedResponse) {
     const request = parsedResponse.request;
-    const operationInfo = (0, operationHelpers_js_1.getOperationRequestInfo)(request);
+    const operationInfo = getOperationRequestInfo(request);
     const shouldDeserialize = operationInfo?.shouldDeserialize;
     let result;
     if (shouldDeserialize === undefined) {
@@ -73,7 +69,7 @@ async function deserializeResponseBody(jsonContentTypes, xmlContentTypes, respon
     if (!shouldDeserializeResponse(parsedResponse)) {
         return parsedResponse;
     }
-    const operationInfo = (0, operationHelpers_js_1.getOperationRequestInfo)(parsedResponse.request);
+    const operationInfo = getOperationRequestInfo(parsedResponse.request);
     const operationSpec = operationInfo?.operationSpec;
     if (!operationSpec || !operationSpec.responses) {
         return parsedResponse;
@@ -91,7 +87,7 @@ async function deserializeResponseBody(jsonContentTypes, xmlContentTypes, respon
     if (responseSpec) {
         if (responseSpec.bodyMapper) {
             let valueToDeserialize = parsedResponse.parsedBody;
-            if (operationSpec.isXML && responseSpec.bodyMapper.type.name === serializer_js_1.MapperTypeNames.Sequence) {
+            if (operationSpec.isXML && responseSpec.bodyMapper.type.name === MapperTypeNames.Sequence) {
                 valueToDeserialize =
                     typeof valueToDeserialize === "object"
                         ? valueToDeserialize[responseSpec.bodyMapper.xmlElementName]
@@ -101,7 +97,7 @@ async function deserializeResponseBody(jsonContentTypes, xmlContentTypes, respon
                 parsedResponse.parsedBody = operationSpec.serializer.deserialize(responseSpec.bodyMapper, valueToDeserialize, "operationRes.parsedBody", options);
             }
             catch (deserializeError) {
-                const restError = new core_rest_pipeline_1.RestError(`Error ${deserializeError} occurred in deserializing the responseBody - ${parsedResponse.bodyAsText}`, {
+                const restError = new RestError(`Error ${deserializeError} occurred in deserializing the responseBody - ${parsedResponse.bodyAsText}`, {
                     statusCode: parsedResponse.status,
                     request: parsedResponse.request,
                     response: parsedResponse,
@@ -143,7 +139,7 @@ function handleErrorResponse(parsedResponse, operationSpec, responseSpec, option
     const initialErrorMessage = parsedResponse.request.streamResponseStatusCodes?.has(parsedResponse.status)
         ? `Unexpected status code: ${parsedResponse.status}`
         : parsedResponse.bodyAsText;
-    const error = new core_rest_pipeline_1.RestError(initialErrorMessage, {
+    const error = new RestError(initialErrorMessage, {
         statusCode: parsedResponse.status,
         request: parsedResponse.request,
         response: parsedResponse,
@@ -165,7 +161,7 @@ function handleErrorResponse(parsedResponse, operationSpec, responseSpec, option
             let deserializedError;
             if (defaultBodyMapper) {
                 let valueToDeserialize = parsedBody;
-                if (operationSpec.isXML && defaultBodyMapper.type.name === serializer_js_1.MapperTypeNames.Sequence) {
+                if (operationSpec.isXML && defaultBodyMapper.type.name === MapperTypeNames.Sequence) {
                     valueToDeserialize = [];
                     const elementName = defaultBodyMapper.xmlElementName;
                     if (typeof parsedBody === "object" && elementName) {
@@ -219,8 +215,8 @@ async function parse(jsonContentTypes, xmlContentTypes, operationResponse, opts,
         }
         catch (err) {
             const msg = `Error "${err}" occurred while parsing the response body - ${operationResponse.bodyAsText}.`;
-            const errCode = err.code || core_rest_pipeline_1.RestError.PARSE_ERROR;
-            const e = new core_rest_pipeline_1.RestError(msg, {
+            const errCode = err.code || RestError.PARSE_ERROR;
+            const e = new RestError(msg, {
                 code: errCode,
                 statusCode: operationResponse.status,
                 request: operationResponse.request,
